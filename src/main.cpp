@@ -13,6 +13,8 @@ int mainFunction(ConfigMap &config) {
     cerr << "[I] Initializing problem...\n";
     Expression *eqn=parseString(config["general::equation"]);
     Expression *pot=parseString(config["general::potential"]);
+    cerr << "[I] Equation: " << eqn << endl;
+    cerr << "[I] Potential: " << pot << endl;
     VarDef params;
     cerr << "[I] Getting parameters:\n";
     for(ConfigMap::iterator it=config.begin();it!=config.end();it++) {
@@ -25,8 +27,6 @@ int mainFunction(ConfigMap &config) {
     cerr.flush();
     eqn=eqn->simplify(params);
     pot=pot->simplify(params);
-    cerr << "[I] Equation: " << eqn << endl;
-    cerr << "[I] Potential: " << pot << endl;
     GPE *gpe=0;
     if(config["general::type"]=="Polar") {
         gpe=new PolarGPE(config,eqn,pot);
@@ -49,10 +49,12 @@ int mainFunction(ConfigMap &config) {
         gpe->save(out);
     }
     if(config["plot"].size()>0) {
-        gpe->plot();
+        int n=getConfig(config,string("plot"),0);
+        gpe->plot(n);
     }
     if(config["spectrum"].size()>0) {
-        gpe->spectrum();
+        int m=getConfig(config,string("spectrum"),0);
+        gpe->spectrum(m);
     }
     return 0;
 };

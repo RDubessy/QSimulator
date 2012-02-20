@@ -74,7 +74,8 @@ void GPE::findGroundState(double dttest, double tol) {
 }
 /* }}} */
 /* spectrum method {{{ */
-void GPE::spectrum() {
+void GPE::spectrum(int m) {
+    correct(m);
     cvm::srbmatrix H1(_H);
     cvm::srbmatrix H3(_H);
     int n=_psi.size();
@@ -100,17 +101,32 @@ void GPE::spectrum() {
             << ' ' << evals(i).imag() << '\n';
     }
     std::cout.flush();
-    cvm::scmatrix upv=cvm::scmatrix(H1)*evecs;
-    for(int i=1;i<=n;i++) {
-        cvm::cvector u(n),v(n);
-        u=(upv(i)/evals(i)+evecs(i))/2;
-        v=(upv(i)/evals(i)-evecs(i))/2;
-        double normu=norm(u);
-        double normv=norm(v);
-        double delta=normu*normu-normv*normv;
-        u/=sqrt(delta);
-        v/=sqrt(delta);
+    std::ofstream file("spectrum.dat",std::ofstream::binary);
+    if(file.is_open()) {
+        std::complex<double> *E=evals.get();
+        setHeader(file);
+        cvm::scmatrix upv=cvm::scmatrix(H1)*evecs;
+        for(int i=1;i<=n;i++) {
+            cvm::cvector u(n),v(n);
+            u=(upv(i)/evals(i)+evecs(i))/2;
+            v=(upv(i)/evals(i)-evecs(i))/2;
+            double normu=norm(u);
+            double normv=norm(v);
+            double delta=normu*normu-normv*normv;
+            u/=sqrt(delta);
+            v/=sqrt(delta);
+            std::complex<double> *U=u.get();
+            std::complex<double> *V=v.get();
+            file.write((const char*)&(E[i]),sizeof(std::complex<double>));
+            for(int j=0;j<n;j++)
+                file.write((const char*)&(U[j]),sizeof(std::complex<double>));
+            for(int j=0;j<n;j++)
+                file.write((const char*)&(V[j]),sizeof(std::complex<double>));
+        }
+    } else {
+        std::cerr << "[E] Can't open file: spectrum.dat" << std::endl;
     }
+    return;
 }
 /* }}} */
 /* normalize method {{{ */
@@ -169,6 +185,11 @@ PolarGPE::PolarGPE(ConfigMap &config, Expression *H,
     _H.resize(_n);
     _H.resize_lu(1,1);
     VarDef vars;
+    //Kinetic term pre-factor
+    vars["DELTA"]=&one;
+    vars["VEXT"]=&zero;
+    vars["RHO"]=&zero;
+    _kterm=*((double*)(H->evaluate(vars)));
     //Interaction term pre-factor
     vars["DELTA"]=&zero;
     vars["VEXT"]=&zero;
@@ -233,23 +254,51 @@ double PolarGPE::norm(cvm::cvector &psi) const {
 }
 /* }}} */
 /* plot method {{{ */
-void PolarGPE::plot() const {
+void PolarGPE::plot(int nmodes) {
     std::ofstream file("/tmp/psi.txt");
-    if(file.is_open()) {
-        const double *v=_psi.get();
+    std::ifstream spectrum("spectrum.dat");
+    std::complex<double> *u=0;
+    std::complex<double> *v=0;
+    if(nmodes>0 && spectrum.is_open() && getHeader(spectrum)) {
+        std::cerr << "[I] Found matching spectrum file" << std::endl;
+        u=new std::complex<double>[_n*_n];
+        v=new std::complex<double>[_n*_n];
         for(int i=0;i<_n;i++) {
-            file << _rmin+i*_dr << ' ' << v[i] << '\n';
+            std::complex<double> e;
+            spectrum.read((char *)&e,sizeof(std::complex<double>));
+            for(int j=0;j<_n;j++)
+                spectrum.read((char *)&u[i*_n+j],sizeof(std::complex<double>));
+            for(int j=0;j<_n;j++)
+                spectrum.read((char *)&v[i*_n+j],sizeof(std::complex<double>));
+        }
+        spectrum.close();
+    } else
+        nmodes=0;
+    if(file.is_open()) {
+        const double *psi=_psi.get();
+        for(int i=0;i<_n;i++) {
+            file << _rmin+i*_dr << ' ' << psi[i];
+            for(int j=0;j<nmodes;j++) {
+                file << ' ' << u[j*_n+i].real()
+                    << ' ' << v[j*_n+i].real();
+            }
+            file << '\n';
         }
         file.close();
     } else {
         std::cerr << "[E] Can't open file \"/tmp/psi.txt\" !" << std::endl;
     }
-    std::cout << "set xlabel \"r\";set ylabel \"Density\";"
-        << "plot \"/tmp/psi.txt\" using 1:($2*$2) title \"\";pause mouse\n";
+    std::cout << "set style data lines;"
+        << "set xlabel \"r\";set ylabel \"Density\";"
+        << "plot \"/tmp/psi.txt\" using 1:($2*$2) title \"\"";
+    for(int i=0;i<nmodes;i++)
+        std::cout << ",\"\" using 1:(2*$2*($" << 2*i+3 << "+$" << 2*i+4 << ")) title \"\"";
+    std::cout << ";pause mouse\n";
     std::cout.flush();
     return;
 }
 /* }}} */
+/* setHeader method {{{ */
 void PolarGPE::setHeader(std::ofstream &file) const {
     const char *type="Pol";
     file.write((const char*)type,3*sizeof(char));
@@ -258,6 +307,8 @@ void PolarGPE::setHeader(std::ofstream &file) const {
     file.write((const char*)&_dr,sizeof(double));
     file.write((const char*)&_mu,sizeof(double));
 }
+/* }}} */
+/* getHeader method {{{ */
 bool PolarGPE::getHeader(std::ifstream &file) {
     char type[3];
     double mu,dr,rmin;
@@ -279,5 +330,18 @@ bool PolarGPE::getHeader(std::ifstream &file) {
     std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << _n << ")" << std::endl;
     return true;
 }
+/* }}} */
+/* correct method {{{ */
+void PolarGPE::correct(int m) {
+    if(m==0) return;
+    double *v=new double[_n];
+    double cor=-1.*(m*m)*_kterm;
+    for(int i=0;i<_n;i++) {
+        double r=_rmin+i*_dr;
+        v[i]=cor/(r*r);
+    }
+    _H.diag(0)+=cvm::rvector(v,_n);
+}
+/* }}} */
 /* }}} */
 /* gpe.cpp */
