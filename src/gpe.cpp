@@ -39,6 +39,7 @@ void quickSort(std::complex<double> *v, int first, int last,cvm::scmatrix &evecs
 /* class GPE implementation {{{ */
 /* findGroundState method {{{ */
 void GPE::findGroundState(double dttest, double tol) {
+    std::cerr << "[I] Find groundstate method..." << std::endl;
     int c=0;
     int n=_psi.size();
     double dt=dttest;
@@ -56,7 +57,7 @@ void GPE::findGroundState(double dttest, double tol) {
         _psi*=(-dt);
         _psi+=psi;
         double tmp=normalize();
-        if(tmp<0.999) {
+        if(tmp<0.9999) {
             dt/=2;
         } else {
             double mu=-log(tmp)/dt;
@@ -69,15 +70,16 @@ void GPE::findGroundState(double dttest, double tol) {
     }
     std::cout.flush();
     _mu=muOld;
-    std::cerr << c << ' ' << norm(_psi) << ' ' << _mu << ' ' << eps << std::endl;
+    std::cerr << "[I] After "<< c << " iterations, mu=" << _mu << " [" << eps << "] " << std::endl;
     return;
 }
 /* }}} */
 /* spectrum method {{{ */
 void GPE::spectrum(int m) {
-    correct(m);
-    cvm::srbmatrix H1(_H);
-    cvm::srbmatrix H3(_H);
+    cvm::srbmatrix Hold(_H);
+    correct(Hold,m);
+    cvm::srbmatrix H1(Hold);
+    cvm::srbmatrix H3(Hold);
     int n=_psi.size();
     double *v1=new double[n];
     double *v3=new double[n];
@@ -96,11 +98,12 @@ void GPE::spectrum(int m) {
     cvm::cvector evals(n);
     evals=H.eig(evecs);
     quickSort(evals.get(),0,n-1,evecs);
+    std::cout << m;
     for(int i=1;i<=n;i++) {
-        std::cout << i << ' ' << evals(i).real()
-            << ' ' << evals(i).imag() << '\n';
+        std::cout << ' ' << evals(i).real()
+            << ' ' << evals(i).imag();
     }
-    std::cout.flush();
+    std::cout << std::endl;
     std::ofstream file("spectrum.dat",std::ofstream::binary);
     if(file.is_open()) {
         std::complex<double> *E=evals.get();
@@ -332,7 +335,7 @@ bool PolarGPE::getHeader(std::ifstream &file) {
 }
 /* }}} */
 /* correct method {{{ */
-void PolarGPE::correct(int m) {
+void PolarGPE::correct(cvm::srbmatrix &H, int m) {
     if(m==0) return;
     double *v=new double[_n];
     double cor=-1.*(m*m)*_kterm;
@@ -340,7 +343,7 @@ void PolarGPE::correct(int m) {
         double r=_rmin+i*_dr;
         v[i]=cor/(r*r);
     }
-    _H.diag(0)+=cvm::rvector(v,_n);
+    H.diag(0)+=cvm::rvector(v,_n);
 }
 /* }}} */
 /* }}} */

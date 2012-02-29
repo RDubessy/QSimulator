@@ -15,12 +15,12 @@ class GPE {
         void load(std::string &name);
         virtual void setHeader(std::ofstream &file) const=0;
         virtual bool getHeader(std::ifstream &file) =0;
-        virtual void correct(int m) {};
+        virtual void correct(cvm::srbmatrix &H, int m) {};
     protected:
-        cvm::srbmatrix _H;
-        cvm::rvector _psi;
-        double _gN;
-        double _mu;
+        cvm::srbmatrix _H;  //!<Single body hamiltonian, stored as a tridiagonal real matrix.
+        cvm::rvector _psi;  //!<Groundstate wave function, stored as a real vector.
+        double _gN;         //!<Interaction term.
+        double _mu;         //!<Chemical potential (or groundstate energy if no interactions).
 };
 /* }}} */
 /* class PolarGPE {{{ */
@@ -33,14 +33,14 @@ class PolarGPE : public GPE {
         void plot(int nmode);
         void setHeader(std::ofstream &file) const;
         bool getHeader(std::ifstream &file);
-        void correct(int m);
+        void correct(cvm::srbmatrix &H, int m);
     private:
-        double _rmin;
-        double _rmax;
-        double _dr;
-        double _kterm;
-        int _l;
-        int _n;
+        double _rmin;   //!<Minimum allowed radius.
+        double _rmax;   //!<Maximum allowed radius.
+        double _dr;     //!<Grid step size.
+        double _kterm;  //!<Kinetic term prefactor.
+        int _l;         //!<Quantum number associated to the rotationnal invariance.
+        int _n;         //!<Number of grid points.
 };
 /* }}} */
 #endif //GPE_H

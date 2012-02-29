@@ -1,3 +1,9 @@
+/*!\mainpage Quantum simulation software.
+ *
+ * \todo Wish list:
+ *  - Implementation of 1D (cartesian) problems,
+ *  - Generalization to higher dimensions (cartesian or cylindrical/spherical).
+ */
 #include <iostream>     //For cerr/cout/endl...
 #include <fstream>      //For ofstream/ifstream...
 #include <common.h>     //For ConfigMap.
@@ -54,7 +60,8 @@ int mainFunction(ConfigMap &config) {
     }
     if(config["spectrum"].size()>0) {
         int m=getConfig(config,string("spectrum"),0);
-        gpe->spectrum(m);
+        for(int i=0;i<=m;i++)
+            gpe->spectrum(i);
     }
     return 0;
 };
