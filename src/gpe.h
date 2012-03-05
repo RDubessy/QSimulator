@@ -43,5 +43,21 @@ class PolarGPE : public GPE {
         int _n;         //!<Number of grid points.
 };
 /* }}} */
+/* class 1DGPE {{{ */
+class x1DGPE : public GPE {
+    public:
+        x1DGPE(ConfigMap &config, Expression *H,
+                Expression *pot);
+        double norm(cvm::rvector &psi) const;
+        double norm(cvm::cvector &psi) const;
+        void plot(int nmode);
+        void setHeader(std::ofstream &file) const;
+        bool getHeader(std::ifstream &file);
+    private:
+        double _xmax;   //!<Half box size.
+        double _dx;     //!<Grid step size.
+        int _n;         //!<Number of grid points.
+};
+/* }}} */
 #endif //GPE_H
 /* gpe.h */

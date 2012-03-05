@@ -98,26 +98,25 @@ void GPE::spectrum(int m) {
     cvm::cvector evals(n);
     evals=H.eig(evecs);
     quickSort(evals.get(),0,n-1,evecs);
-    std::cout << m;
-    for(int i=1;i<=n;i++) {
-        std::cout << ' ' << evals(i).real()
-            << ' ' << evals(i).imag();
-    }
-    std::cout << std::endl;
     std::ofstream file("spectrum.dat",std::ofstream::binary);
+    double sumv2=0.;
     if(file.is_open()) {
         std::complex<double> *E=evals.get();
         setHeader(file);
         cvm::scmatrix upv=cvm::scmatrix(H1)*evecs;
         for(int i=1;i<=n;i++) {
+            evals(i)=std::sqrt(evals(i));
             cvm::cvector u(n),v(n);
             u=(upv(i)/evals(i)+evecs(i))/2;
             v=(upv(i)/evals(i)-evecs(i))/2;
             double normu=norm(u);
             double normv=norm(v);
             double delta=normu*normu-normv*normv;
-            u/=sqrt(delta);
-            v/=sqrt(delta);
+            if(delta!=0) {
+                u/=sqrt(delta);
+                v/=sqrt(delta);
+                sumv2+=normv*normv/delta;
+            }
             std::complex<double> *U=u.get();
             std::complex<double> *V=v.get();
             file.write((const char*)&(E[i]),sizeof(std::complex<double>));
@@ -129,6 +128,13 @@ void GPE::spectrum(int m) {
     } else {
         std::cerr << "[E] Can't open file: spectrum.dat" << std::endl;
     }
+    //Save values to standard output
+    std::cout << m << ' ' << sumv2;
+    for(int i=1;i<=n;i++) {
+        std::cout << ' ' << evals(i).real()
+            << ' ' << evals(i).imag();
+    }
+    std::cout << std::endl;
     return;
 }
 /* }}} */
@@ -164,6 +170,7 @@ void GPE::load(std::string &name) {
             return;
         double *v=_psi.get();
         int n=_psi.size();
+        std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << n << ")" << std::endl;
         for(int i=0;i<n;i++) {
             file.read((char*)&(v[i]),sizeof(double));
         }
@@ -182,7 +189,7 @@ PolarGPE::PolarGPE(ConfigMap &config, Expression *H,
     _n=getConfig(config,string("polar::n"),64);
     _rmin=getConfig(config,string("polar::rmin"),0.01);
     _rmax=getConfig(config,string("polar::rmax"),1.0);
-    _dr=(_rmax-_rmin)/_n;
+    _dr=(_rmax-_rmin)/(_n-1);
     _l=0;
     _psi.resize(_n);
     _H.resize(_n);
@@ -294,8 +301,10 @@ void PolarGPE::plot(int nmodes) {
     std::cout << "set style data lines;"
         << "set xlabel \"r\";set ylabel \"Density\";"
         << "plot \"/tmp/psi.txt\" using 1:($2*$2) title \"\"";
-    for(int i=0;i<nmodes;i++)
+    for(int i=0;i<nmodes;i++) {
         std::cout << ",\"\" using 1:(2*$2*($" << 2*i+3 << "+$" << 2*i+4 << ")) title \"\"";
+        //std::cout << ",\"\" using 1:($" << 2*i+4 << ") title \"\"";
+    }
     std::cout << ";pause mouse\n";
     std::cout.flush();
     return;
@@ -330,7 +339,6 @@ bool PolarGPE::getHeader(std::ifstream &file) {
         std::cerr << "[E] Incompatible size !" << std::endl;
         return false;
     }
-    std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << _n << ")" << std::endl;
     return true;
 }
 /* }}} */
@@ -344,6 +352,156 @@ void PolarGPE::correct(cvm::srbmatrix &H, int m) {
         v[i]=cor/(r*r);
     }
     H.diag(0)+=cvm::rvector(v,_n);
+}
+/* }}} */
+/* }}} */
+/* class x1DGPE implementation {{{ */        
+/* Constructor {{{ */
+x1DGPE::x1DGPE(ConfigMap &config, Expression *H,
+        Expression *pot) : GPE() {
+    _n=getConfig(config,string("x1D::n"),64);
+    _xmax=getConfig(config,string("x1D::L"),0.01);
+    _dx=_xmax/(_n-1);
+    _xmax/=2;
+    _psi.resize(_n);
+    _H.resize(_n);
+    _H.resize_lu(1,1);
+    VarDef vars;
+    //Interaction term pre-factor
+    vars["DELTA"]=&zero;
+    vars["VEXT"]=&zero;
+    vars["RHO"]=&one;
+    _gN=*((double*)(H->evaluate(vars)));
+    //Diagonal part
+    vars["RHO"]=&zero;
+    vars["DX"]=new Constant(_dx);
+    vars["VEXT"]=pot;
+    vars["DELTA"]=parseString("-2/DX^2");
+    Expression *diag=H->simplify(vars);
+    vars["VEXT"]=&zero;
+    vars["DELTA"]=parseString("1/DX^2");
+    Expression *diagu=H->simplify(vars);
+    vars["DELTA"]=parseString("1/DX^2");
+    Expression *diagl=H->simplify(vars);
+    vars["X"]=new Constant(0);
+    double *v=new double[_n];
+    double *psi=new double[_n];
+    for(int i=0;i<_n;i++) {
+        double x=i*_dx-_xmax;
+        vars["X"]->set(&x);
+        v[i]=*((double*)(diag->evaluate(vars)));
+        psi[i]=std::exp(-2.5*(*((double*)(pot->evaluate(vars))))/(_xmax));
+    }
+    _H.diag(0).assign(v);
+    _psi.assign(psi);
+    delete[] v;
+    double *vu=new double[_n-1];
+    double *vl=new double[_n-1];
+    for(int i=0;i<_n-1;i++) {
+        vu[i]=*((double*)(diagu->evaluate(vars)));
+        vl[i]=*((double*)(diagl->evaluate(vars)));
+    }
+    _H.diag(1).assign(vu);
+    _H.diag(-1).assign(vl);
+    delete[] vu;
+    delete[] vl;
+}
+/* }}} */
+/* norm methods {{{ */
+double x1DGPE::norm(cvm::rvector &psi) const {
+    double res=0.;
+    double *v=psi.get();
+    int n=psi.size();
+    for(int i=0;i<n;i++)
+        res+=v[i]*v[i];
+    return sqrt(_dx*res);
+}
+double x1DGPE::norm(cvm::cvector &psi) const {
+    double res=0.;
+    std::complex<double> *v=psi.get();
+    int n=psi.size();
+    for(int i=0;i<n;i++)
+        res+=std::norm(v[i]);
+    return sqrt(_dx*res);
+}
+/* }}} */
+/* plot method {{{ */
+void x1DGPE::plot(int nmodes) {
+    std::ofstream file("/tmp/psi.txt");
+    std::ifstream spectrum("spectrum.dat");
+    std::complex<double> *u=0;
+    std::complex<double> *v=0;
+    if(nmodes>0 && spectrum.is_open() && getHeader(spectrum)) {
+        std::cerr << "[I] Found matching spectrum file" << std::endl;
+        u=new std::complex<double>[_n*_n];
+        v=new std::complex<double>[_n*_n];
+        for(int i=0;i<_n;i++) {
+            std::complex<double> e;
+            spectrum.read((char *)&e,sizeof(std::complex<double>));
+            for(int j=0;j<_n;j++)
+                spectrum.read((char *)&u[i*_n+j],sizeof(std::complex<double>));
+            for(int j=0;j<_n;j++)
+                spectrum.read((char *)&v[i*_n+j],sizeof(std::complex<double>));
+        }
+        spectrum.close();
+    } else
+        nmodes=0;
+    if(file.is_open()) {
+        const double *psi=_psi.get();
+        for(int i=0;i<_n;i++) {
+            file << i*_dx-_xmax << ' ' << psi[i];
+            for(int j=0;j<nmodes;j++) {
+                file << ' ' << u[j*_n+i].real()
+                    << ' ' << v[j*_n+i].real();
+            }
+            file << '\n';
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file \"/tmp/psi.txt\" !" << std::endl;
+    }
+    std::cout << "set style data lines;"
+        << "set xlabel \"x\";set ylabel \"Density\";"
+        << "plot \"/tmp/psi.txt\" using 1:($2*$2) title \"\"";
+    for(int i=0;i<nmodes;i++) {
+        std::cout << ",\"\" using 1:(2*$2*($" << 2*i+3 << "+$" << 2*i+4 << ")) title \"\"";
+        //std::cout << ",\"\" using 1:($" << 2*i+4 << ") title \"\"";
+    }
+    std::cout << ";pause mouse\n";
+    std::cout.flush();
+    return;
+}
+/* }}} */
+/* setHeader method {{{ */
+void x1DGPE::setHeader(std::ofstream &file) const {
+    const char *type="x1D";
+    file.write((const char*)type,3*sizeof(char));
+    file.write((const char*)&_n,sizeof(int));
+    file.write((const char*)&_xmax,sizeof(double));
+    file.write((const char*)&_dx,sizeof(double));
+    file.write((const char*)&_mu,sizeof(double));
+}
+/* }}} */
+/* getHeader method {{{ */
+bool x1DGPE::getHeader(std::ifstream &file) {
+    char type[3];
+    double mu,dx,xmax;
+    int n;
+    file.read((char*)type,3*sizeof(char));
+    file.read((char*)&n,sizeof(int));
+    file.read((char*)&xmax,sizeof(double));
+    file.read((char*)&dx,sizeof(double));
+    file.read((char*)&mu,sizeof(double));
+    _mu=mu;
+    if(type[0]!='x' || type[1]!='1' || type[2]!='D') {
+        std::cerr << "[E] Incompatible type !" << std::endl;
+        return false;
+    }
+    if(n!=_n) {
+        std::cerr << "[E] Incompatible size !" << std::endl;
+        return false;
+    }
+    return true;
 }
 /* }}} */
 /* }}} */
