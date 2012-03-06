@@ -1,8 +1,6 @@
 /*!\mainpage Quantum simulation software.
  *
- * \todo Wish list:
- *  - Implementation of 1D (cartesian) problems,
- *  - Generalization to higher dimensions (cartesian or cylindrical/spherical).
+ * \todo Generalization to higher dimensions (cartesian or cylindrical/spherical).
  */
 #include <iostream>     //For cerr/cout/endl...
 #include <fstream>      //For ofstream/ifstream...
@@ -35,9 +33,9 @@ int mainFunction(ConfigMap &config) {
     pot=pot->simplify(params);
     GPE *gpe=0;
     if(config["general::type"]=="Polar") {
-        gpe=new PolarGPE(config,eqn,pot);
+        gpe=new Polar1D(config,eqn,pot);
     } else if(config["general::type"]=="Cartesian1D") {
-        gpe=new x1DGPE(config,eqn,pot);
+        gpe=new GPE1D(config,eqn,pot);
     }
     if(gpe==0) {
         std::cerr << "[E] Unknown problem type!" << std::endl;

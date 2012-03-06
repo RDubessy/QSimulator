@@ -182,9 +182,9 @@ void GPE::load(std::string &name) {
 }
 /* }}} */
 /* }}} */
-/* class PolarGPE implementation {{{ */        
+/* class Polar1D implementation {{{ */        
 /* Constructor {{{ */
-PolarGPE::PolarGPE(ConfigMap &config, Expression *H,
+Polar1D::Polar1D(ConfigMap &config, Expression *H,
         Expression *pot) : GPE() {
     _n=getConfig(config,string("polar::n"),64);
     _rmin=getConfig(config,string("polar::rmin"),0.01);
@@ -244,7 +244,7 @@ PolarGPE::PolarGPE(ConfigMap &config, Expression *H,
 }
 /* }}} */
 /* norm methods {{{ */
-double PolarGPE::norm(cvm::rvector &psi) const {
+double Polar1D::norm(cvm::rvector &psi) const {
     double res=0.;
     double *v=psi.get();
     int n=psi.size();
@@ -253,7 +253,7 @@ double PolarGPE::norm(cvm::rvector &psi) const {
         res+=(rmin+i)*v[i]*v[i];
     return _dr*sqrt(2*pi*res);
 }
-double PolarGPE::norm(cvm::cvector &psi) const {
+double Polar1D::norm(cvm::cvector &psi) const {
     double res=0.;
     std::complex<double> *v=psi.get();
     int n=psi.size();
@@ -264,7 +264,7 @@ double PolarGPE::norm(cvm::cvector &psi) const {
 }
 /* }}} */
 /* plot method {{{ */
-void PolarGPE::plot(int nmodes) {
+void Polar1D::plot(int nmodes) {
     std::ofstream file("/tmp/psi.txt");
     std::ifstream spectrum("spectrum.dat");
     std::complex<double> *u=0;
@@ -311,7 +311,7 @@ void PolarGPE::plot(int nmodes) {
 }
 /* }}} */
 /* setHeader method {{{ */
-void PolarGPE::setHeader(std::ofstream &file) const {
+void Polar1D::setHeader(std::ofstream &file) const {
     const char *type="Pol";
     file.write((const char*)type,3*sizeof(char));
     file.write((const char*)&_n,sizeof(int));
@@ -321,7 +321,7 @@ void PolarGPE::setHeader(std::ofstream &file) const {
 }
 /* }}} */
 /* getHeader method {{{ */
-bool PolarGPE::getHeader(std::ifstream &file) {
+bool Polar1D::getHeader(std::ifstream &file) {
     char type[3];
     double mu,dr,rmin;
     int n;
@@ -343,7 +343,7 @@ bool PolarGPE::getHeader(std::ifstream &file) {
 }
 /* }}} */
 /* correct method {{{ */
-void PolarGPE::correct(cvm::srbmatrix &H, int m) {
+void Polar1D::correct(cvm::srbmatrix &H, int m) {
     if(m==0) return;
     double *v=new double[_n];
     double cor=-1.*(m*m)*_kterm;
@@ -355,9 +355,9 @@ void PolarGPE::correct(cvm::srbmatrix &H, int m) {
 }
 /* }}} */
 /* }}} */
-/* class x1DGPE implementation {{{ */        
+/* class GPE1D implementation {{{ */        
 /* Constructor {{{ */
-x1DGPE::x1DGPE(ConfigMap &config, Expression *H,
+GPE1D::GPE1D(ConfigMap &config, Expression *H,
         Expression *pot) : GPE() {
     _n=getConfig(config,string("x1D::n"),64);
     _xmax=getConfig(config,string("x1D::L"),0.01);
@@ -408,7 +408,7 @@ x1DGPE::x1DGPE(ConfigMap &config, Expression *H,
 }
 /* }}} */
 /* norm methods {{{ */
-double x1DGPE::norm(cvm::rvector &psi) const {
+double GPE1D::norm(cvm::rvector &psi) const {
     double res=0.;
     double *v=psi.get();
     int n=psi.size();
@@ -416,7 +416,7 @@ double x1DGPE::norm(cvm::rvector &psi) const {
         res+=v[i]*v[i];
     return sqrt(_dx*res);
 }
-double x1DGPE::norm(cvm::cvector &psi) const {
+double GPE1D::norm(cvm::cvector &psi) const {
     double res=0.;
     std::complex<double> *v=psi.get();
     int n=psi.size();
@@ -426,7 +426,7 @@ double x1DGPE::norm(cvm::cvector &psi) const {
 }
 /* }}} */
 /* plot method {{{ */
-void x1DGPE::plot(int nmodes) {
+void GPE1D::plot(int nmodes) {
     std::ofstream file("/tmp/psi.txt");
     std::ifstream spectrum("spectrum.dat");
     std::complex<double> *u=0;
@@ -473,7 +473,7 @@ void x1DGPE::plot(int nmodes) {
 }
 /* }}} */
 /* setHeader method {{{ */
-void x1DGPE::setHeader(std::ofstream &file) const {
+void GPE1D::setHeader(std::ofstream &file) const {
     const char *type="x1D";
     file.write((const char*)type,3*sizeof(char));
     file.write((const char*)&_n,sizeof(int));
@@ -483,7 +483,7 @@ void x1DGPE::setHeader(std::ofstream &file) const {
 }
 /* }}} */
 /* getHeader method {{{ */
-bool x1DGPE::getHeader(std::ifstream &file) {
+bool GPE1D::getHeader(std::ifstream &file) {
     char type[3];
     double mu,dx,xmax;
     int n;
