@@ -38,9 +38,10 @@ void quickSort(std::complex<double> *v, int first, int last,cvm::scmatrix &evecs
 /* }}} */
 /* class GPE implementation {{{ */
 /* findGroundState method {{{ */
-void GPE::findGroundState(double dttest, double tol) {
+void GPE::findGroundState(double dttest, double tol, string &name) {
     std::cerr << "[I] Find groundstate method..." << std::endl;
     int c=0;
+    int p=1;
     int n=_psi.size();
     double dt=dttest;
     double muOld=1e3;
@@ -48,27 +49,42 @@ void GPE::findGroundState(double dttest, double tol) {
     cvm::rvector psi(n);
     double *v=psi.get();
     double *_v=_psi.get();
-    while(eps>tol) {
-        psi=_psi;
-        _psi=_H*psi;
-        //Computes the interaction term
-        for(int i=0;i<n;i++)
-            _v[i]+=v[i]*v[i]*v[i]*_gN;
-        _psi*=(-dt);
-        _psi+=psi;
-        double tmp=normalize();
-        if(tmp<0.9999) {
-            dt/=2;
-        } else {
-            double mu=-log(tmp)/dt;
-            eps=std::abs((mu-muOld)/muOld);
-            muOld=mu;
-        }
-        c++;
-        if(c%100==0)
-            std::cout << c << ' ' << tmp << ' ' << dt << ' ' << muOld << ' ' << eps << '\n';
+    double ttol=tol*1e6;
+    std::ofstream file(name.c_str());
+    bool logout=file.is_open();
+    if(!logout) {
+        cerr << "[W] Cannot open logging file: " << name << std::endl;
     }
-    std::cout.flush();
+    while(ttol>tol) {
+        std::cerr << "[I]\tpass #" << p << " objective: " << ttol;
+        std::cerr.flush();
+        while(eps>ttol) {
+            psi=_psi;
+            _psi=_H*psi;
+            //Computes the interaction term
+            for(int i=0;i<n;i++)
+                _v[i]+=v[i]*v[i]*v[i]*_gN;
+            _psi*=(-dt);
+            _psi+=psi;
+            double tmp=normalize();
+            if(tmp<0.9999) {        //Choose dt.
+                dt/=2;
+            } else {
+                double mu=-log(tmp)/dt;
+                eps=std::abs((mu-muOld)/muOld);
+                muOld=mu;
+            }
+            c++;
+            if(logout && c%100==0)
+                file << c << ' ' << tmp << ' ' << dt << ' ' << muOld << ' ' << eps << '\n';
+        }
+        std::cerr << ", done: " << eps << std::endl;
+        ttol/=10;
+        p++;
+        dt=dttest;
+    }
+    if(logout)
+        file.close();
     _mu=muOld;
     std::cerr << "[I] After "<< c << " iterations, mu=" << _mu << " [" << eps << "] " << std::endl;
     return;

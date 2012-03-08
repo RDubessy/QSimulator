@@ -10,7 +10,7 @@
 #include "gpe.h"        //For GPE class (and sub-classes).
 /* mainFunction method {{{ */
 int mainFunction(ConfigMap &config) {
-    if(config["general::equation"].size()==0) {
+    if(config.find("general::equation")==config.end()) {
         cerr << "[E] No problem defined!" << endl;
         return -1;
     }
@@ -48,17 +48,24 @@ int mainFunction(ConfigMap &config) {
     if(config["out"].size()>0) {
         out=config["out"];
     }
-    if(config["groundstate"].size()>0) {
+    string log="";
+    if(config.find("log")!=config.end()) {
+        log="log.txt";
+        if(config["log"].size()>0) {
+            log=config["log"];
+        }
+    }
+    if(config.find("groundstate")!=config.end()) {
         double dt=getConfig(config,string("general::dt"),1e-3);
         double tol=getConfig(config,string("general::tol"),1e-8);
-        gpe->findGroundState(dt,tol);
+        gpe->findGroundState(dt,tol,log);
         gpe->save(out);
     }
-    if(config["plot"].size()>0) {
+    if(config.find("plot")!=config.end()) {
         int n=getConfig(config,string("plot"),0);
         gpe->plot(n);
     }
-    if(config["spectrum"].size()>0) {
+    if(config.find("spectrum")!=config.end()) {
         int m=getConfig(config,string("spectrum"),0);
         for(int i=0;i<=m;i++)
             gpe->spectrum(i);
@@ -78,7 +85,7 @@ int main(int argc, char *argv[]) {
         cerr << "==> Try '" << argv[0] << " --usage'" << endl;
         return -1;
     }
-    if(config["usage"].size()>0||config["help"].size()>0) {
+    if(config.find("usage")!=config.end()||config.find("help")!=config.end()) {
         usage(argv[0]);
         return -1;
     }
