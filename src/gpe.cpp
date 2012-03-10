@@ -49,10 +49,10 @@ void GPE::findGroundState(double dttest, double tol, string &name) {
     cvm::rvector psi(n);
     double *v=psi.get();
     double *_v=_psi.get();
-    double ttol=tol*1e6;
+    double ttol=0.01;
     std::ofstream file(name.c_str());
     bool logout=file.is_open();
-    if(!logout) {
+    if(!logout && name.size()>0) {
         cerr << "[W] Cannot open logging file: " << name << std::endl;
     }
     while(ttol>tol) {
@@ -78,7 +78,7 @@ void GPE::findGroundState(double dttest, double tol, string &name) {
             if(logout && c%100==0)
                 file << c << ' ' << tmp << ' ' << dt << ' ' << muOld << ' ' << eps << '\n';
         }
-        std::cerr << ", done: " << eps << std::endl;
+        std::cerr << ", done: " << eps << ", mu=" << muOld << std::endl;
         ttol/=10;
         p++;
         dt=dttest;
@@ -86,12 +86,12 @@ void GPE::findGroundState(double dttest, double tol, string &name) {
     if(logout)
         file.close();
     _mu=muOld;
-    std::cerr << "[I] After "<< c << " iterations, mu=" << _mu << " [" << eps << "] " << std::endl;
+    std::cerr << "[I] After "<< c << " iterations, mu=" << _mu << " [" << eps << "]." << std::endl;
     return;
 }
 /* }}} */
 /* spectrum method {{{ */
-void GPE::spectrum(int m) {
+void GPE::spectrum(string &name, int m) {
     cvm::srbmatrix Hold(_H);
     correct(Hold,m);
     cvm::srbmatrix H1(Hold);
@@ -144,13 +144,21 @@ void GPE::spectrum(int m) {
     } else {
         std::cerr << "[E] Can't open file: spectrum.dat" << std::endl;
     }
-    //Save values to standard output
-    std::cout << m << ' ' << sumv2;
-    for(int i=1;i<=n;i++) {
-        std::cout << ' ' << evals(i).real()
-            << ' ' << evals(i).imag();
+    if(name.size()>0) {
+        std::ofstream logfile(name.c_str(),std::ofstream::app);
+        bool logout=logfile.is_open();
+        if(!logout) {
+            cerr << "[W] Cannot open logging file: " << name << std::endl;
+        } else {
+            logfile << m << ' ' << sumv2;
+            for(int i=1;i<=n;i++) {
+                logfile << ' ' << evals(i).real()
+                    << ' ' << evals(i).imag();
+            }
+            logfile << std::endl;
+            logfile.close();
+        }
     }
-    std::cout << std::endl;
     return;
 }
 /* }}} */
@@ -419,6 +427,8 @@ GPE1D::GPE1D(ConfigMap &config, Expression *H,
     }
     _H.diag(1).assign(vu);
     _H.diag(-1).assign(vl);
+    _H(1,1)=-vu[0];
+    _H(_n,_n)=-vu[0];
     delete[] vu;
     delete[] vl;
 }

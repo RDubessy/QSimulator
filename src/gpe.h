@@ -27,7 +27,7 @@ class GPE {
         /*!\brief Computes the groundstate wave function of the system. */
         void findGroundState(double dttest, double tol, string &name);
         /*!\brief Computes the Bogolyubov spectrum of the system. */
-        void spectrum(int m=0);
+        void spectrum(string &name, int m=0);
         /*!\brief Normalize the groundstate wave function. */
         double normalize();
         /*!\brief Computes the norm of a real vector. */

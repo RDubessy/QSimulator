@@ -68,7 +68,7 @@ int mainFunction(ConfigMap &config) {
     if(config.find("spectrum")!=config.end()) {
         int m=getConfig(config,string("spectrum"),0);
         for(int i=0;i<=m;i++)
-            gpe->spectrum(i);
+            gpe->spectrum(log,i);
     }
     return 0;
 };
