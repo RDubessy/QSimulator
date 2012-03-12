@@ -66,8 +66,9 @@ int mainFunction(ConfigMap &config) {
         gpe->plot(n);
     }
     if(config.find("spectrum")!=config.end()) {
-        int m=getConfig(config,string("spectrum"),0);
-        for(int i=0;i<=m;i++)
+        range<int> def={0,0,1};
+        range<int> m=getConfig(config,string("spectrum"),def);
+        for(int i=m.min;i<=m.max;i+=m.incr)
             gpe->spectrum(log,i);
     }
     return 0;

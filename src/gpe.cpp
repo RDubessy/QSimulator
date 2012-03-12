@@ -92,6 +92,7 @@ void GPE::findGroundState(double dttest, double tol, string &name) {
 /* }}} */
 /* spectrum method {{{ */
 void GPE::spectrum(string &name, int m) {
+    std::cerr << "[I] Compute spectrum method... m=" << m << std::endl;
     cvm::srbmatrix Hold(_H);
     correct(Hold,m);
     cvm::srbmatrix H1(Hold);
