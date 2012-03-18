@@ -25,7 +25,7 @@ class GPE {
         /*!\brief Constructor. */
         GPE() {};
         /*!\brief Computes the groundstate wave function of the system. */
-        void findGroundState(double dttest, double tol, string &name);
+        void findGroundState(double dttest, double tol, double dttol, string &name);
         /*!\brief Computes the Bogolyubov spectrum of the system. */
         void spectrum(string &name, int m=0);
         /*!\brief Normalize the groundstate wave function. */

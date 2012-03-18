@@ -38,7 +38,7 @@ void quickSort(std::complex<double> *v, int first, int last,cvm::scmatrix &evecs
 /* }}} */
 /* class GPE implementation {{{ */
 /* findGroundState method {{{ */
-void GPE::findGroundState(double dttest, double tol, string &name) {
+void GPE::findGroundState(double dttest, double tol, double dttol, string &name) {
     std::cerr << "[I] Find groundstate method..." << std::endl;
     int c=0;
     int p=1;
@@ -67,7 +67,7 @@ void GPE::findGroundState(double dttest, double tol, string &name) {
             _psi*=(-dt);
             _psi+=psi;
             double tmp=normalize();
-            if(tmp<0.9999) {        //Choose dt.
+            if(tmp<dttol) {        //Choose dt.
                 dt/=2;
             } else {
                 double mu=-log(tmp)/dt;
@@ -115,7 +115,11 @@ void GPE::spectrum(string &name, int m) {
     cvm::cvector evals(n);
     evals=H.eig(evecs);
     quickSort(evals.get(),0,n-1,evecs);
-    std::ofstream file("spectrum.dat",std::ofstream::binary);
+    char buffer[256];
+    sprintf(buffer,"_spectrum_m%d",m);
+    string s=name;
+    s+=buffer;
+    std::ofstream file(s.c_str(),std::ofstream::binary);
     double sumv2=0.;
     if(file.is_open()) {
         std::complex<double> *E=evals.get();
@@ -314,8 +318,8 @@ void Polar1D::plot(int nmodes) {
         for(int i=0;i<_n;i++) {
             file << _rmin+i*_dr << ' ' << psi[i];
             for(int j=0;j<nmodes;j++) {
-                file << ' ' << u[j*_n+i].real()
-                    << ' ' << v[j*_n+i].real();
+                file << ' ' << u[j*_n+i].real() << ' ' << u[j*_n+i].imag() << ' '
+                    << ' ' << v[j*_n+i].real() << ' ' << v[j*_n+i].imag();
             }
             file << '\n';
         }
@@ -327,8 +331,7 @@ void Polar1D::plot(int nmodes) {
         << "set xlabel \"r\";set ylabel \"Density\";"
         << "plot \"/tmp/psi.txt\" using 1:($2*$2) title \"\"";
     for(int i=0;i<nmodes;i++) {
-        std::cout << ",\"\" using 1:(2*$2*($" << 2*i+3 << "+$" << 2*i+4 << ")) title \"\"";
-        //std::cout << ",\"\" using 1:($" << 2*i+4 << ") title \"\"";
+        std::cout << ",\"\" using 1:(2*$2*($" << 4*i+3 << "+$" << 4*i+4 << ")) title \"\"";
     }
     std::cout << ";pause mouse\n";
     std::cout.flush();
