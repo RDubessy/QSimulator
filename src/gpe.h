@@ -35,7 +35,7 @@ class GPE {
         /*!\brief Computes the norm of a complex vector. */
         virtual double norm(cvm::cvector &psi) const=0;
         /*!\brief Implements the --plot option through gnuplot. */
-        virtual void plot(int nmode) =0;
+        virtual void plot(int nmode, std::string &name) =0;
         /*!\brief Save the groundstate wave function to a file. */
         void save(std::string &name) const;
         /*!\brief Load the groundstate wave function from a file. */
@@ -45,7 +45,7 @@ class GPE {
         /*!\brief Get the header from an input file. */
         virtual bool getHeader(std::ifstream &file) =0;
         /*!\brief Correct the hamiltonian for excited states. */
-        virtual void correct(cvm::srbmatrix &H, int m) {};
+        virtual void correct(cvm::srmatrix &H, int m) {};
     protected:
         cvm::srbmatrix _H;  //!<Single body hamiltonian, stored as a tridiagonal real matrix.
         cvm::rvector _psi;  //!<Groundstate wave function, stored as a real vector.
@@ -75,10 +75,10 @@ class Polar1D : public GPE {
                 Expression *pot);
         double norm(cvm::rvector &psi) const;
         double norm(cvm::cvector &psi) const;
-        void plot(int nmode);
+        void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
         bool getHeader(std::ifstream &file);
-        void correct(cvm::srbmatrix &H, int m);
+        void correct(cvm::srmatrix &H, int m);
     private:
         double _rmin;   //!<Minimum allowed radius.
         double _rmax;   //!<Maximum allowed radius.
@@ -102,7 +102,7 @@ class GPE1D : public GPE {
                 Expression *pot);
         double norm(cvm::rvector &psi) const;
         double norm(cvm::cvector &psi) const;
-        void plot(int nmode);
+        void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
         bool getHeader(std::ifstream &file);
     private:

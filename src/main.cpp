@@ -63,8 +63,8 @@ int mainFunction(ConfigMap &config) {
         gpe->save(out);
     }
     if(config.find("plot")!=config.end()) {
-        int n=getConfig(config,string("plot"),0);
-        gpe->plot(n);
+        int n=5; //getConfig(config,string("plot"),0);
+        gpe->plot(n,config["plot"]);
     }
     if(config.find("spectrum")!=config.end()) {
         range<int> def={0,0,1};

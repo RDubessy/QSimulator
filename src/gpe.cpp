@@ -93,61 +93,68 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name)
 /* spectrum method {{{ */
 void GPE::spectrum(string &name, int m) {
     std::cerr << "[I] Compute spectrum method... m=" << m << std::endl;
-    cvm::srbmatrix Hold(_H);
-    correct(Hold,m);
-    cvm::srbmatrix H1(Hold);
-    cvm::srbmatrix H3(Hold);
     int n=_psi.size();
-    double *v1=new double[n];
-    double *v3=new double[n];
+    int N=2*n;
+    cvm::srmatrix H(N);
+    cvm::srmatrix A(H,1,1,n);
+    cvm::srmatrix B(H,1,n+1,n);
+    cvm::srmatrix C(H,n+1,1,n);
+    cvm::srmatrix D(H,n+1,n+1,n);
+    A+=_H;
+    D-=_H;
+    double *psi2=new double[n];
+    double *d=new double[n];
     double *v=_psi.get();
     for(int i=0;i<n;i++) {
-        double gterm=_gN*v[i]*v[i];
-        v1[i]=gterm-_mu;
-        v3[i]=3*gterm-_mu;
+        psi2[i]=_gN*v[i]*v[i];
+        d[i]=2*psi2[i]-_mu;
     }
-    H3.diag(0)+=cvm::rvector(v3,n);
-    H1.diag(0)+=cvm::rvector(v1,n);
-    delete[] v1;
-    delete[] v3;
-    cvm::srbmatrix H=H3*H1;
-    cvm::scmatrix evecs(n);
-    cvm::cvector evals(n);
+    A.diag(0)+=cvm::rvector(d,n);
+    D.diag(0)-=cvm::rvector(d,n);
+    B.diag(0)+=cvm::rvector(psi2,n);
+    C.diag(0)-=cvm::rvector(psi2,n);
+    delete[] psi2;
+    delete[] d;
+    correct(H,m);
+    cvm::cvector evals(N);
+    cvm::scmatrix evecs(N);
     evals=H.eig(evecs);
-    quickSort(evals.get(),0,n-1,evecs);
+    quickSort(evals.get(),0,N-1,evecs);
     char buffer[256];
     sprintf(buffer,"_spectrum_m%d",m);
     string s=name;
     s+=buffer;
     std::ofstream file(s.c_str(),std::ofstream::binary);
     double sumv2=0.;
+    bool *pfamily=new bool[N];
     if(file.is_open()) {
         std::complex<double> *E=evals.get();
         setHeader(file);
-        cvm::scmatrix upv=cvm::scmatrix(H1)*evecs;
-        for(int i=1;i<=n;i++) {
-            evals(i)=std::sqrt(evals(i));
+        for(int i=1;i<=N;i++) {
+            cvm::cvector col(evecs(i));
             cvm::cvector u(n),v(n);
-            u=(upv(i)/evals(i)+evecs(i))/2;
-            v=(upv(i)/evals(i)-evecs(i))/2;
+            u=cvm::cvector(&(col.get()[0]),n);
+            v=cvm::cvector(&(col.get()[n]),n);
             double normu=norm(u);
             double normv=norm(v);
             double delta=normu*normu-normv*normv;
-            if(delta!=0) {
+            if(delta>0) {
                 u/=sqrt(delta);
                 v/=sqrt(delta);
                 sumv2+=normv*normv/delta;
-            }
-            std::complex<double> *U=u.get();
-            std::complex<double> *V=v.get();
-            file.write((const char*)&(E[i]),sizeof(std::complex<double>));
-            for(int j=0;j<n;j++)
-                file.write((const char*)&(U[j]),sizeof(std::complex<double>));
-            for(int j=0;j<n;j++)
-                file.write((const char*)&(V[j]),sizeof(std::complex<double>));
+                std::complex<double> *U=u.get();
+                std::complex<double> *V=v.get();
+                file.write((const char*)&(E[i]),sizeof(std::complex<double>));
+                for(int j=0;j<n;j++)
+                    file.write((const char*)&(U[j]),sizeof(std::complex<double>));
+                for(int j=0;j<n;j++)
+                    file.write((const char*)&(V[j]),sizeof(std::complex<double>));
+                pfamily[i-1]=true;
+            } else
+                pfamily[i-1]=false;
         }
     } else {
-        std::cerr << "[E] Can't open file: spectrum.dat" << std::endl;
+        std::cerr << "[E] Can't open file: " << s << std::endl;
     }
     if(name.size()>0) {
         std::ofstream logfile(name.c_str(),std::ofstream::app);
@@ -156,9 +163,10 @@ void GPE::spectrum(string &name, int m) {
             cerr << "[W] Cannot open logging file: " << name << std::endl;
         } else {
             logfile << m << ' ' << sumv2;
-            for(int i=1;i<=n;i++) {
-                logfile << ' ' << evals(i).real()
-                    << ' ' << evals(i).imag();
+            for(int i=1;i<=N;i++) {
+                if(pfamily[i-1])
+                    logfile << ' ' << evals(i).real()
+                        << ' ' << evals(i).imag();
             }
             logfile << std::endl;
             logfile.close();
@@ -219,7 +227,7 @@ Polar1D::Polar1D(ConfigMap &config, Expression *H,
     _rmin=getConfig(config,string("polar::rmin"),0.01);
     _rmax=getConfig(config,string("polar::rmax"),1.0);
     _dr=(_rmax-_rmin)/(_n-1);
-    _l=0;
+    _l=getConfig(config,string("polar::l"),0);
     _psi.resize(_n);
     _H.resize(_n);
     _H.resize_lu(1,1);
@@ -249,11 +257,14 @@ Polar1D::Polar1D(ConfigMap &config, Expression *H,
     vars["R"]=new Constant(0);
     double *v=new double[_n];
     double *psi=new double[_n];
+    double r0=(_rmin+_rmax)/2;
+    double R=sqrt(2*5);
     for(int i=0;i<_n;i++) {
         double r=_rmin+i*_dr;
         vars["R"]->set(&r);
         v[i]=*((double*)(diag->evaluate(vars)));
-        psi[i]=std::exp(-5*(*((double*)(pot->evaluate(vars))))/(_rmax-_rmin));
+        //psi[i]=std::exp(-5*(*((double*)(pot->evaluate(vars))))/(_rmax-_rmin));
+        psi[i]=std::abs(r-r0)<R?sqrt(5/_gN*(1-pow((r-r0)/R,2))):0;
     }
     _H.diag(0).assign(v);
     _psi.assign(psi);
@@ -293,9 +304,9 @@ double Polar1D::norm(cvm::cvector &psi) const {
 }
 /* }}} */
 /* plot method {{{ */
-void Polar1D::plot(int nmodes) {
+void Polar1D::plot(int nmodes, std::string &name) {
     std::ofstream file("/tmp/psi.txt");
-    std::ifstream spectrum("spectrum.dat");
+    std::ifstream spectrum(name.c_str());
     std::complex<double> *u=0;
     std::complex<double> *v=0;
     if(nmodes>0 && spectrum.is_open() && getHeader(spectrum)) {
@@ -371,15 +382,18 @@ bool Polar1D::getHeader(std::ifstream &file) {
 }
 /* }}} */
 /* correct method {{{ */
-void Polar1D::correct(cvm::srbmatrix &H, int m) {
+void Polar1D::correct(cvm::srmatrix &H, int m) {
     if(m==0) return;
-    double *v=new double[_n];
-    double cor=-1.*(m*m)*_kterm;
+    double *v=new double[2*_n];
+    double cor=-1.*_kterm;
     for(int i=0;i<_n;i++) {
         double r=_rmin+i*_dr;
-        v[i]=cor/(r*r);
+        double invr2=cor/(r*r);
+        v[i]=m*(m+2*_l)*invr2;
+        v[i+_n]=m*(2*_l-m)*invr2;
     }
-    H.diag(0)+=cvm::rvector(v,_n);
+    H.diag(0)+=cvm::rvector(v,2*_n);
+    delete[] v;
 }
 /* }}} */
 /* }}} */
@@ -456,9 +470,9 @@ double GPE1D::norm(cvm::cvector &psi) const {
 }
 /* }}} */
 /* plot method {{{ */
-void GPE1D::plot(int nmodes) {
+void GPE1D::plot(int nmodes, std::string &name) {
     std::ofstream file("/tmp/psi.txt");
-    std::ifstream spectrum("spectrum.dat");
+    std::ifstream spectrum(name.c_str());
     std::complex<double> *u=0;
     std::complex<double> *v=0;
     if(nmodes>0 && spectrum.is_open() && getHeader(spectrum)) {
