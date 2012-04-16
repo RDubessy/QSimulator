@@ -342,7 +342,7 @@ void Polar1D::plot(int nmodes, std::string &name) {
         << "set xlabel \"r\";set ylabel \"Density\";"
         << "plot \"/tmp/psi.txt\" using 1:($2*$2) title \"\"";
     for(int i=0;i<nmodes;i++) {
-        std::cout << ",\"\" using 1:(2*$2*($" << 4*i+3 << "+$" << 4*i+4 << ")) title \"\"";
+        std::cout << ",\"\" using 1:(2*$2*($" << 4*i+3 << "+$" << 4*i+5 << ")) title \"\"";
     }
     std::cout << ";pause mouse\n";
     std::cout.flush();
