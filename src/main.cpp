@@ -1,5 +1,8 @@
 /*!\mainpage Quantum simulation software.
  *
+ * This program is designed to study the Non-Linear Schrodinger Equation (NLSE)
+ * which is relevant, for instance, to describe Bose-Einstein Condensates.
+ *
  * \todo Generalization to higher dimensions (cartesian or cylindrical/spherical).
  */
 #include <iostream>     //For cerr/cout/endl...
@@ -77,7 +80,12 @@ int mainFunction(ConfigMap &config) {
 /* }}} */
 /* usage method {{{ */
 void usage(const char *name) {
-    cerr << name << endl;
+    cerr << "Usage: " << name << " CONFIG_FILE [OPTIONS]\n"
+        << "The << qsimu >> program is intended to study properties of the Non-Linear\n"
+        << "Schrodinger Equation (NLSE) also known in the cold atom community as the\n"
+        << "Gross-Pitaevskii Equation (GPE). As of now it can compute the groundstate\n"
+        << "of the equation and the spectrum of linear excitations."
+        << endl;
 };
 /* }}} */
 /* main method {{{ */

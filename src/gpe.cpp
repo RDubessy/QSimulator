@@ -37,7 +37,55 @@ void quickSort(std::complex<double> *v, int first, int last,cvm::scmatrix &evecs
 };
 /* }}} */
 /* class GPE implementation {{{ */
+/* Constructor {{{ */
+GPE::GPE(Expression *H) {
+    VarDef vars;
+    //Kinetic term pre-factor
+    vars["DELTA"]=&one;
+    vars["VEXT"]=&zero;
+    vars["RHO"]=&zero;
+    _kterm=*((double*)(H->evaluate(vars)));
+    //Interaction term pre-factor
+    vars["DELTA"]=&zero;
+    vars["VEXT"]=&zero;
+    vars["RHO"]=&one;
+    _gN=*((double*)(H->evaluate(vars)));
+    //Potential term pre-factor
+    vars["DELTA"]=&zero;
+    vars["VEXT"]=&one;
+    vars["RHO"]=&zero;
+    _vterm=*((double*)(H->evaluate(vars)));
+}
+/* }}} */
 /* findGroundState method {{{ */
+/*! This method uses an imaginary time propagation algorithm to compute the
+ * groundstate of the system:
+ * \f[
+ * \left|\psi(t+dt)\right>=\exp{\left[-\frac{Ht}{\hbar}\right]}\left|\psi(t)\right>.
+ * \f]
+ * After each step the norm of the function is computed which allows to evaluate
+ * its chemical potential:
+ * \f[
+ * \mu=-\frac{\log{\left[\left<\psi(t+dt)\right|
+ * \left.\psi(t+dt)\right>\right]}}{dt}.
+ * \f]
+ * The algorithm terminates when the relative change in the chemical potential
+ * is below a given value.
+ *
+ * Since a high accuracy is needed in the determination of the groundstate, it
+ * is more efficient to first choose the evolution time step be monitoring the
+ * norm and when the norm change is sufficiently small keep the same time step
+ * to find the groundstate.
+ *
+ * The initial state \f$\left|\psi(0)\right>\f$ must be initialized before calling
+ * this function which allows to apply this algorithm to a guess groundstate that
+ * must be refined.
+ *
+ * \param dttest an initial (largest) time step.
+ * \param tol the relative target accuracy for the chemical potential.
+ * \param dttol the relative target accuracy on the fonction norm.
+ * \param name a string containing the name of a log file.
+ */
 void GPE::findGroundState(double dttest, double tol, double dttol, string &name) {
     std::cerr << "[I] Find groundstate method..." << std::endl;
     int c=0;
@@ -222,7 +270,7 @@ void GPE::load(std::string &name) {
 /* class Polar1D implementation {{{ */        
 /* Constructor {{{ */
 Polar1D::Polar1D(ConfigMap &config, Expression *H,
-        Expression *pot) : GPE() {
+        Expression *pot) : GPE(H) {
     _n=getConfig(config,string("polar::n"),64);
     _rmin=getConfig(config,string("polar::rmin"),0.01);
     _rmax=getConfig(config,string("polar::rmax"),1.0);
@@ -231,52 +279,44 @@ Polar1D::Polar1D(ConfigMap &config, Expression *H,
     _psi.resize(_n);
     _H.resize(_n);
     _H.resize_lu(1,1);
-    VarDef vars;
-    //Kinetic term pre-factor
-    vars["DELTA"]=&one;
-    vars["VEXT"]=&zero;
-    vars["RHO"]=&zero;
-    _kterm=*((double*)(H->evaluate(vars)));
-    //Interaction term pre-factor
-    vars["DELTA"]=&zero;
-    vars["VEXT"]=&zero;
-    vars["RHO"]=&one;
-    _gN=*((double*)(H->evaluate(vars)));
     //Diagonal part
-    vars["RHO"]=&zero;
-    vars["DR"]=new Constant(_dr);
-    vars["L"]=new Constant(_l);
-    vars["VEXT"]=pot;
-    vars["DELTA"]=parseString("-2/DR^2-(L/R)^2");
-    Expression *diag=H->simplify(vars);
-    vars["VEXT"]=&zero;
-    vars["DELTA"]=parseString("1/DR^2+0.5/(R*DR)");
-    Expression *diagu=H->simplify(vars);
-    vars["DELTA"]=parseString("1/DR^2-0.5/((R+DR)*DR)");
-    Expression *diagl=H->simplify(vars);
+    VarDef vars;
     vars["R"]=new Constant(0);
     double *v=new double[_n];
     double *psi=new double[_n];
-    double r0=(_rmin+_rmax)/2;
-    double R=sqrt(2*5);
     for(int i=0;i<_n;i++) {
         double r=_rmin+i*_dr;
         vars["R"]->set(&r);
-        v[i]=*((double*)(diag->evaluate(vars)));
-        //psi[i]=std::exp(-5*(*((double*)(pot->evaluate(vars))))/(_rmax-_rmin));
-        psi[i]=std::abs(r-r0)<R?sqrt(5/_gN*(1-pow((r-r0)/R,2))):0;
+        double vpot=*((double*)(pot->evaluate(vars)));
+        vpot*=_vterm;
+        v[i]=_kterm*(-2/(_dr*_dr)-_l*_l/(r*r))+vpot;
+        psi[i]=vpot<1?sqrt(1-vpot):0;
     }
+    //Special case r=0
+    vars["R"]->set(&_rmin);
+    v[0]=*((double*)(pot->evaluate(vars)));
+    v[0]*=_vterm;
+    v[0]+=_kterm*(-1/(_dr*_dr)-_l*_l/(_rmin*_rmin));
+    //Special case r=inf
+    double rmax=_rmin+(_n-1)*_dr;
+    vars["R"]->set(&rmax);
+    v[_n-1]=*((double*)(pot->evaluate(vars)));
+    v[_n-1]*=_vterm;
+    v[_n-1]+=_kterm*(-1/(_dr*_dr)-_l*_l/(rmax*rmax));
+    //Assign H diagonal and initial state
     _H.diag(0).assign(v);
     _psi.assign(psi);
     delete[] v;
+    //Upper and Lower diagonals
     double *vu=new double[_n-1];
     double *vl=new double[_n-1];
     for(int i=0;i<_n-1;i++) {
         double r=_rmin+i*_dr;
-        vars["R"]->set(&r);
-        vu[i]=*((double*)(diagu->evaluate(vars)));
-        vl[i]=*((double*)(diagl->evaluate(vars)));
+        vu[i]=_kterm*(1./_dr+0.5/r)/_dr;
+        vl[i]=_kterm*(1./_dr-0.5/(r+_dr))/_dr;
     }
+    //r=0
+    vu[0]=_kterm/(_dr*_dr);
     _H.diag(1).assign(vu);
     _H.diag(-1).assign(vl);
     delete[] vu;
@@ -400,7 +440,7 @@ void Polar1D::correct(cvm::srmatrix &H, int m) {
 /* class GPE1D implementation {{{ */        
 /* Constructor {{{ */
 GPE1D::GPE1D(ConfigMap &config, Expression *H,
-        Expression *pot) : GPE() {
+        Expression *pot) : GPE(H) {
     _n=getConfig(config,string("x1D::n"),64);
     _xmax=getConfig(config,string("x1D::L"),0.01);
     _dx=_xmax/(_n-1);
@@ -409,44 +449,30 @@ GPE1D::GPE1D(ConfigMap &config, Expression *H,
     _H.resize(_n);
     _H.resize_lu(1,1);
     VarDef vars;
-    //Interaction term pre-factor
-    vars["DELTA"]=&zero;
-    vars["VEXT"]=&zero;
-    vars["RHO"]=&one;
-    _gN=*((double*)(H->evaluate(vars)));
     //Diagonal part
-    vars["RHO"]=&zero;
-    vars["DX"]=new Constant(_dx);
-    vars["VEXT"]=pot;
-    vars["DELTA"]=parseString("-2/DX^2");
-    Expression *diag=H->simplify(vars);
-    vars["VEXT"]=&zero;
-    vars["DELTA"]=parseString("1/DX^2");
-    Expression *diagu=H->simplify(vars);
-    vars["DELTA"]=parseString("1/DX^2");
-    Expression *diagl=H->simplify(vars);
     vars["X"]=new Constant(0);
     double *v=new double[_n];
     double *psi=new double[_n];
     for(int i=0;i<_n;i++) {
         double x=i*_dx-_xmax;
         vars["X"]->set(&x);
-        v[i]=*((double*)(diag->evaluate(vars)));
-        psi[i]=std::exp(-2.5*(*((double*)(pot->evaluate(vars))))/(_xmax));
+        double vpot=*((double*)(pot->evaluate(vars)));
+        vpot*=_vterm;
+        v[i]=_kterm*(-2/(_dx*_dx))+vpot;
+        psi[i]=std::exp(-2.5*vpot/_xmax);
     }
     _H.diag(0).assign(v);
     _psi.assign(psi);
     delete[] v;
+    //Upper and lower diagonal
     double *vu=new double[_n-1];
     double *vl=new double[_n-1];
     for(int i=0;i<_n-1;i++) {
-        vu[i]=*((double*)(diagu->evaluate(vars)));
-        vl[i]=*((double*)(diagl->evaluate(vars)));
+        vu[i]=_kterm/(_dx*_dx);
+        vl[i]=vu[i];
     }
     _H.diag(1).assign(vu);
     _H.diag(-1).assign(vl);
-    _H(1,1)=-vu[0];
-    _H(_n,_n)=-vu[0];
     delete[] vu;
     delete[] vl;
 }

@@ -6,16 +6,23 @@
  *
  * This equation may be written in physical units:
  * \f[
- * \imath\partial_t\psi(r,t)=\left(-\frac{\hbar^2}{2m}\Delta+V(r)
+ * \imath\hbar\partial_t\psi(r,t)=\left(-\frac{\hbar^2}{2m}\Delta+V(r)
  * +gN\left|\psi(r,t)\right|^2\right)\psi(r,t),
  * \f]
  * where \f$\hbar\f$ is the reduced Planck constant, \f$m\f$ is the particle
  * mass, \f$\Delta\f$ is the Laplacian, \f$V(r)\f$ is the external trapping
  * potential, \f$g\f$ is the interaction coupling constant and \f$N\f$ the atom
  * number.
+ * This equation assumes the normalization condition:
+ * \f[
+ * \int d^3r \left|\psi(r,t)\right|^2=1.
+ * \f]
  *
  * The main purpose is to compute the groundstate of the equation and the linear
  * spectrum of excitation (through the Bogolyubov de Gennes equations).
+ * These tasks are done in to public methods:
+ * - findGroundState(),
+ * - spectrum().
  *
  * This class is virtual and therefore cannot be instancied, because the
  * Laplacian is not specified.
@@ -23,7 +30,7 @@
 class GPE {
     public:
         /*!\brief Constructor. */
-        GPE() {};
+        GPE(Expression *H);
         /*!\brief Computes the groundstate wave function of the system. */
         void findGroundState(double dttest, double tol, double dttol, string &name);
         /*!\brief Computes the Bogolyubov spectrum of the system. */
@@ -50,22 +57,25 @@ class GPE {
         cvm::srbmatrix _H;  //!<Single body hamiltonian, stored as a tridiagonal real matrix.
         cvm::rvector _psi;  //!<Groundstate wave function, stored as a real vector.
         double _gN;         //!<Interaction term.
+        double _kterm;      //!<Kinetic term prefactor.
+        double _vterm;      //!<Potential term prefactor.
         double _mu;         //!<Chemical potential (or groundstate energy if no interactions).
 };
 /* }}} */
 /* class PolarGPE {{{ */
 /*!\brief This class implements a Gross-Pitaevskii equation in polar coordinates
- * assuming rotational invariance.
+ * (2D space) assuming rotational invariance, which allows to reduce the problem
+ * to an effective 1D equation.
  *
  * In this case the laplacian is:
  * \f[
  * \Delta=\frac{\partial^2}{\partial r^2}+\frac{1}{r}\frac{\partial}{\partial r}
- * -\frac{l^2}{r^2},
+ * -\frac{\ell^2}{r^2},
  * \f]
- * where \f$l\f$ is a quantum number associated to the rotational invariance,
+ * where \f$\ell\f$ is a quantum number associated to the rotational invariance,
  * namely:
  * \f[
- * \hat{L}_z\psi=\hbar l\psi.
+ * \hat{L}_z\psi=\hbar\ell\psi.
  * \f]
  */
 class Polar1D : public GPE {
@@ -83,7 +93,6 @@ class Polar1D : public GPE {
         double _rmin;   //!<Minimum allowed radius.
         double _rmax;   //!<Maximum allowed radius.
         double _dr;     //!<Grid step size.
-        double _kterm;  //!<Kinetic term prefactor.
         int _l;         //!<Quantum number associated to the rotationnal invariance.
         int _n;         //!<Number of grid points.
 };
