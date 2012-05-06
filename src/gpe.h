@@ -34,7 +34,7 @@ class GPE {
         /*!\brief Computes the groundstate wave function of the system. */
         void findGroundState(double dttest, double tol, double dttol, string &name);
         /*!\brief Computes the Bogolyubov spectrum of the system. */
-        void spectrum(string &name, int m=0);
+        virtual void spectrum(string &name, int m=0);
         /*!\brief Normalize the groundstate wave function. */
         double normalize();
         /*!\brief Computes the norm of a real vector. */
@@ -62,7 +62,7 @@ class GPE {
         double _mu;         //!<Chemical potential (or groundstate energy if no interactions).
 };
 /* }}} */
-/* class PolarGPE {{{ */
+/* class Polar1D {{{ */
 /*!\brief This class implements a Gross-Pitaevskii equation in polar coordinates
  * (2D space) assuming rotational invariance, which allows to reduce the problem
  * to an effective 1D equation.
@@ -118,6 +118,26 @@ class GPE1D : public GPE {
         double _xmax;   //!<Half box size.
         double _dx;     //!<Grid step size.
         int _n;         //!<Number of grid points.
+};
+/* }}} */
+/* class GPE2D {{{ */
+class GPE2D : public GPE {
+    public:
+        GPE2D(ConfigMap &config, Expression *H,
+                Expression *pot);
+        void spectrum(string &name, int m=0);
+        double norm(cvm::rvector &psi) const;
+        double norm(cvm::cvector &psi) const;
+        void plot(int nmode, std::string &name);
+        void setHeader(std::ofstream &file) const;
+        bool getHeader(std::ifstream &file);
+    private:
+        double _xmax;
+        double _ymax;
+        double _dx;
+        double _dy;
+        int _nx;
+        int _ny;
 };
 /* }}} */
 #endif //GPE_H

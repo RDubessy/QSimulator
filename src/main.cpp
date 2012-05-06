@@ -39,6 +39,8 @@ int mainFunction(ConfigMap &config) {
         gpe=new Polar1D(config,eqn,pot);
     } else if(config["general::type"]=="Cartesian1D") {
         gpe=new GPE1D(config,eqn,pot);
+    } else if(config["general::type"]=="Cartesian2D") {
+        gpe=new GPE2D(config,eqn,pot);
     }
     if(gpe==0) {
         std::cerr << "[E] Unknown problem type!" << std::endl;

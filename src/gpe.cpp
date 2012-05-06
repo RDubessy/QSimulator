@@ -267,10 +267,11 @@ void GPE::load(std::string &name) {
 }
 /* }}} */
 /* }}} */
-/* class Polar1D implementation {{{ */        
+/* class Polar1D implementation {{{ */ 
 /* Constructor {{{ */
 Polar1D::Polar1D(ConfigMap &config, Expression *H,
         Expression *pot) : GPE(H) {
+    std::cerr << "[I] Initializing a 1D Polar system" << std::endl;
     _n=getConfig(config,string("polar::n"),64);
     _rmin=getConfig(config,string("polar::rmin"),0.01);
     _rmax=getConfig(config,string("polar::rmax"),1.0);
@@ -391,7 +392,7 @@ void Polar1D::plot(int nmodes, std::string &name) {
 /* }}} */
 /* setHeader method {{{ */
 void Polar1D::setHeader(std::ofstream &file) const {
-    const char *type="Pol";
+    const char *type="POL";
     file.write((const char*)type,3*sizeof(char));
     file.write((const char*)&_n,sizeof(int));
     file.write((const char*)&_rmin,sizeof(double));
@@ -441,6 +442,7 @@ void Polar1D::correct(cvm::srmatrix &H, int m) {
 /* Constructor {{{ */
 GPE1D::GPE1D(ConfigMap &config, Expression *H,
         Expression *pot) : GPE(H) {
+    std::cerr << "[I] Initializing a 1D Cartesian system" << std::endl;
     _n=getConfig(config,string("x1D::n"),64);
     _xmax=getConfig(config,string("x1D::L"),0.01);
     _dx=_xmax/(_n-1);
@@ -479,20 +481,10 @@ GPE1D::GPE1D(ConfigMap &config, Expression *H,
 /* }}} */
 /* norm methods {{{ */
 double GPE1D::norm(cvm::rvector &psi) const {
-    double res=0.;
-    double *v=psi.get();
-    int n=psi.size();
-    for(int i=0;i<n;i++)
-        res+=v[i]*v[i];
-    return sqrt(_dx*res);
+    return sqrt(_dx)*psi.norm();
 }
 double GPE1D::norm(cvm::cvector &psi) const {
-    double res=0.;
-    std::complex<double> *v=psi.get();
-    int n=psi.size();
-    for(int i=0;i<n;i++)
-        res+=std::norm(v[i]);
-    return sqrt(_dx*res);
+    return sqrt(_dx)*psi.norm();
 }
 /* }}} */
 /* plot method {{{ */
@@ -568,6 +560,98 @@ bool GPE1D::getHeader(std::ifstream &file) {
         return false;
     }
     if(n!=_n) {
+        std::cerr << "[E] Incompatible size !" << std::endl;
+        return false;
+    }
+    return true;
+}
+/* }}} */
+/* }}} */
+/* class GPE2D implementation {{{ */
+GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H) {
+    std::cerr << "[I] Initializing a 2D Cartesian system" << std::endl;
+    _nx=getConfig(config,string("x2D::nx"),64);
+    _ny=getConfig(config,string("x2D::ny"),_nx);
+    _xmax=getConfig(config,string("x2D::xmax"),1.);
+    _ymax=getConfig(config,string("x2D::ymax"),_xmax);
+    _dx=2*_xmax/(_nx-1);
+    _dy=2*_ymax/(_ny-1);
+    int n=_nx*_ny;
+    _psi.resize(n);
+    _H.resize(n);
+    //Only a diagonal part
+    VarDef vars;
+    vars["X"]=new Constant(0);
+    vars["Y"]=new Constant(0);
+    double *v=new double[n];
+    double *psi=new double[n];
+    for(int j=0;j<_ny;j++) {
+        double y=j*_dy-_ymax;
+        vars["Y"]->set(&y);
+        for(int i=0;i<_nx;i++) {
+            double x=i*_dx-_xmax;
+            vars["X"]->set(&x);
+            double vpot=*((double*)(pot->evaluate(vars)));
+            vpot*=_vterm;
+            v[i+j*_nx]=vpot;
+            psi[i+j*_nx]=vpot<1?sqrt(1-vpot):0;
+        }
+    }
+    //Assign H diagonal and initial state
+    _H.diag(0).assign(v);
+    _psi.assign(psi);
+    delete[] v;
+}
+/* spectrum method {{{ */
+void GPE2D::spectrum(string &name, int m) {
+    std::cerr << "[E] spectrum method NOT implemented for a 2D system !" << std::endl;
+    return;
+}
+/* }}} */
+/* norm methods {{{ */
+double GPE2D::norm(cvm::rvector &psi) const {
+    return sqrt(_dx*_dy)*psi.norm();
+}
+double GPE2D::norm(cvm::cvector &psi) const {
+    return sqrt(_dx*_dy)*psi.norm();
+}
+/* }}} */
+/* plot method {{{ */
+void GPE2D::plot(int nmode, std::string &name) {
+}
+/* }}} */
+/* setHeader method {{{ */
+void GPE2D::setHeader(std::ofstream &file) const {
+    const char *type="x2D";
+    file.write((const char*)type,3*sizeof(char));
+    file.write((const char*)&_nx,sizeof(int));
+    file.write((const char*)&_ny,sizeof(int));
+    file.write((const char*)&_xmax,sizeof(double));
+    file.write((const char*)&_ymax,sizeof(double));
+    file.write((const char*)&_dx,sizeof(double));
+    file.write((const char*)&_dy,sizeof(double));
+    file.write((const char*)&_mu,sizeof(double));
+}
+/* }}} */
+/* getHeader method {{{ */
+bool GPE2D::getHeader(std::ifstream &file) {
+    char type[3];
+    double mu,dx,xmax,dy,ymax;
+    int nx,ny;
+    file.read((char*)type,3*sizeof(char));
+    file.read((char*)&nx,sizeof(int));
+    file.read((char*)&ny,sizeof(int));
+    file.read((char*)&xmax,sizeof(double));
+    file.read((char*)&ymax,sizeof(double));
+    file.read((char*)&dx,sizeof(double));
+    file.read((char*)&dy,sizeof(double));
+    file.read((char*)&mu,sizeof(double));
+    _mu=mu;
+    if(type[0]!='x' || type[1]!='2' || type[2]!='D') {
+        std::cerr << "[E] Incompatible type !" << std::endl;
+        return false;
+    }
+    if(nx!=_nx || ny!=_ny) {
         std::cerr << "[E] Incompatible size !" << std::endl;
         return false;
     }
