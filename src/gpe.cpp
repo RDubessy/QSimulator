@@ -55,6 +55,7 @@ GPE::GPE(Expression *H) {
     vars["VEXT"]=&one;
     vars["RHO"]=&zero;
     _vterm=*((double*)(H->evaluate(vars)));
+    _vpot=0;
 }
 /* }}} */
 /* findGroundState method {{{ */
@@ -90,33 +91,28 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name)
     std::cerr << "[I] Find groundstate method..." << std::endl;
     int c=0;
     int p=1;
-    int n=_psi.size();
     double dt=dttest;
     double muOld=1e3;
     double eps=1.0;
-    cvm::rvector psi(n);
-    double *v=psi.get();
-    double *_v=_psi.get();
     double ttol=0.01;
     std::ofstream file(name.c_str());
     bool logout=file.is_open();
     if(!logout && name.size()>0) {
         cerr << "[W] Cannot open logging file: " << name << std::endl;
     }
+    _mu=0;
+    //Initialize the phase for fft
+    computePhase(std::complex<double>(-dt,0));
     while(ttol>tol) {
         std::cerr << "[I]\tpass #" << p << " objective: " << ttol;
         std::cerr.flush();
         while(eps>ttol) {
-            psi=_psi;
-            _psi=_H*psi;
-            //Computes the interaction term
-            for(int i=0;i<n;i++)
-                _v[i]+=v[i]*v[i]*v[i]*_gN;
-            _psi*=(-dt);
-            _psi+=psi;
+            doStep(std::complex<double>(-dt,0));
             double tmp=normalize();
             if(tmp<dttol) {        //Choose dt.
                 dt/=2;
+                //Update the phase
+                computePhase(std::complex<double>(-dt,0));
             } else {
                 double mu=-log(tmp)/dt;
                 eps=std::abs((mu-muOld)/muOld);
@@ -130,6 +126,8 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name)
         ttol/=10;
         p++;
         dt=dttest;
+        //Update the phase
+        computePhase(std::complex<double>(-dt,0));
     }
     if(logout)
         file.close();
@@ -152,9 +150,9 @@ void GPE::spectrum(string &name, int m) {
     D-=_H;
     double *psi2=new double[n];
     double *d=new double[n];
-    double *v=_psi.get();
+    std::complex<double> *v=_psi.get();
     for(int i=0;i<n;i++) {
-        psi2[i]=_gN*v[i]*v[i];
+        psi2[i]=_gN*std::norm(v[i]);
         d[i]=2*psi2[i]-_mu;
     }
     A.diag(0)+=cvm::rvector(d,n);
@@ -235,10 +233,13 @@ void GPE::save(std::string &name) const {
     std::ofstream file(name.c_str(),std::ofstream::binary);
     if(file.is_open()) {
         setHeader(file);
-        const double *v=_psi.get();
+        const std::complex<double> *v=_psi.get();
         int n=_psi.size();
         for(int i=0;i<n;i++) {
-            file.write((const char*)&(v[i]),sizeof(double));
+            file.write((const char*)&(v[i].real()),sizeof(double));
+        }
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(v[i].imag()),sizeof(double));
         }
         file.close();
     } else {
@@ -253,17 +254,56 @@ void GPE::load(std::string &name) {
     if(file.is_open()) {
         if(!getHeader(file))
             return;
-        double *v=_psi.get();
+        std::complex<double> *v=_psi.get();
         int n=_psi.size();
         std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << n << ")" << std::endl;
         for(int i=0;i<n;i++) {
-            file.read((char*)&(v[i]),sizeof(double));
+            file.read((char*)&(v[i].real()),sizeof(double));
+        }
+        if(!file.eof()) {
+            for(int i=0;i<n;i++) {
+                file.read((char*)&(v[i].imag()),sizeof(double));
+            }
         }
         file.close();
     } else {
         std::cerr << "[E] Can't open file:" << name << std::endl;
     }
     return;
+}
+/* }}} */
+/* doStep method {{{ */
+void GPE::doStep(std::complex<double> dt) {
+    int n=_psi.size();
+    std::complex<double> *v=_psi.get();
+    for(int i=0;i<n;i++)
+        v[i]*=std::exp(dt*(_vpot[i]+_gN*std::norm(v[i])-_mu));
+    fftw_execute(_planFFT);
+    for(int i=0;i<n;i++)
+        _psip[i]*=_phase[i];
+    fftw_execute(_planIFFT);
+}
+/* }}} */
+/* evolve method {{{ */
+void GPE::evolve(double tstart, double dttest, double tend) {
+    double t=tstart;
+    std::complex<double> dt=std::complex<double>(0,-dttest);
+    int c=0;
+    computePhase(dt);
+    while(t<tend) {
+        doStep(dt);
+        if(c%10000==0)
+            std::cerr << c << ' ' << norm(_psi) << ' ' << _psi.get()[128] << std::endl;
+        t+=dttest;
+        c++;
+    }
+}
+/* }}} */
+/* allocate method {{{ */
+void GPE::allocate(int n) {
+    _psip=new std::complex<double>[n];
+    _phase=new std::complex<double>[n];
+    _vpot=new double[n];
 }
 /* }}} */
 /* }}} */
@@ -280,6 +320,7 @@ Polar1D::Polar1D(ConfigMap &config, Expression *H,
     _psi.resize(_n);
     _H.resize(_n);
     _H.resize_lu(1,1);
+    allocate(_n);
     //Diagonal part
     VarDef vars;
     vars["R"]=new Constant(0);
@@ -290,6 +331,7 @@ Polar1D::Polar1D(ConfigMap &config, Expression *H,
         vars["R"]->set(&r);
         double vpot=*((double*)(pot->evaluate(vars)));
         vpot*=_vterm;
+        _vpot[i]=vpot;
         v[i]=_kterm*(-2/(_dr*_dr)-_l*_l/(r*r))+vpot;
         psi[i]=vpot<1?sqrt(1-vpot):0;
     }
@@ -306,7 +348,7 @@ Polar1D::Polar1D(ConfigMap &config, Expression *H,
     v[_n-1]+=_kterm*(-1/(_dr*_dr)-_l*_l/(rmax*rmax));
     //Assign H diagonal and initial state
     _H.diag(0).assign(v);
-    _psi.assign(psi);
+    _psi=cvm::cvector(psi,_n);
     delete[] v;
     //Upper and Lower diagonals
     double *vu=new double[_n-1];
@@ -366,9 +408,9 @@ void Polar1D::plot(int nmodes, std::string &name) {
     } else
         nmodes=0;
     if(file.is_open()) {
-        const double *psi=_psi.get();
+        const std::complex<double> *psi=_psi.get();
         for(int i=0;i<_n;i++) {
-            file << _rmin+i*_dr << ' ' << psi[i];
+            file << _rmin+i*_dr << ' ' << psi[i].real() << ' ' << psi[i].imag();
             for(int j=0;j<nmodes;j++) {
                 file << ' ' << u[j*_n+i].real() << ' ' << u[j*_n+i].imag() << ' '
                     << ' ' << v[j*_n+i].real() << ' ' << v[j*_n+i].imag();
@@ -381,9 +423,9 @@ void Polar1D::plot(int nmodes, std::string &name) {
     }
     std::cout << "set style data lines;"
         << "set xlabel \"r\";set ylabel \"Density\";"
-        << "plot \"/tmp/psi.txt\" using 1:($2*$2) title \"\"";
+        << "plot \"/tmp/psi.txt\" using 1:($2*$2+$3*$3) title \"\"";
     for(int i=0;i<nmodes;i++) {
-        std::cout << ",\"\" using 1:(2*$2*($" << 4*i+3 << "+$" << 4*i+5 << ")) title \"\"";
+        std::cout << ",\"\" using 1:(2*$2*($" << 4*i+4 << "+$" << 4*i+6 << ")) title \"\"";
     }
     std::cout << ";pause mouse\n";
     std::cout.flush();
@@ -392,7 +434,7 @@ void Polar1D::plot(int nmodes, std::string &name) {
 /* }}} */
 /* setHeader method {{{ */
 void Polar1D::setHeader(std::ofstream &file) const {
-    const char *type="POL";
+    const char *type="Pol";
     file.write((const char*)type,3*sizeof(char));
     file.write((const char*)&_n,sizeof(int));
     file.write((const char*)&_rmin,sizeof(double));
@@ -437,6 +479,22 @@ void Polar1D::correct(cvm::srmatrix &H, int m) {
     delete[] v;
 }
 /* }}} */
+/* doStep method {{{ */
+void Polar1D::doStep(std::complex<double> dt) {
+    int n=_psi.size();
+    cvm::cvector psi(n);
+    std::complex<double> *v=psi.get();
+    std::complex <double> *_v=_psi.get();
+    psi=_psi;
+    _psi.real()=_H*psi.real();
+    _psi.imag()=_H*psi.imag();
+    //Computes the interaction term
+    for(int i=0;i<n;i++)
+        _v[i]+=std::norm(v[i])*v[i]*_gN;
+    _psi*=dt;
+    _psi+=psi;
+}
+/* }}} */
 /* }}} */
 /* class GPE1D implementation {{{ */        
 /* Constructor {{{ */
@@ -450,8 +508,9 @@ GPE1D::GPE1D(ConfigMap &config, Expression *H,
     _psi.resize(_n);
     _H.resize(_n);
     _H.resize_lu(1,1);
-    VarDef vars;
+    allocate(_n);
     //Diagonal part
+    VarDef vars;
     vars["X"]=new Constant(0);
     double *v=new double[_n];
     double *psi=new double[_n];
@@ -460,11 +519,11 @@ GPE1D::GPE1D(ConfigMap &config, Expression *H,
         vars["X"]->set(&x);
         double vpot=*((double*)(pot->evaluate(vars)));
         vpot*=_vterm;
+        _vpot[i]=vpot;
         v[i]=_kterm*(-2/(_dx*_dx))+vpot;
-        psi[i]=std::exp(-2.5*vpot/_xmax);
+        psi[i]=vpot<1?sqrt(1-vpot):0;
     }
     _H.diag(0).assign(v);
-    _psi.assign(psi);
     delete[] v;
     //Upper and lower diagonal
     double *vu=new double[_n-1];
@@ -477,14 +536,21 @@ GPE1D::GPE1D(ConfigMap &config, Expression *H,
     _H.diag(-1).assign(vl);
     delete[] vu;
     delete[] vl;
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
+    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
+    _planFFT=fftw_plan_dft_3d(1,1,_n,rspace,pspace,FFTW_FORWARD,0);
+    _planIFFT=fftw_plan_dft_3d(1,1,_n,pspace,rspace,FFTW_BACKWARD,0);
+    //Copy initial state into memory
+    _psi=cvm::cvector(psi,_n);
+    delete[] psi;
 }
 /* }}} */
 /* norm methods {{{ */
 double GPE1D::norm(cvm::rvector &psi) const {
-    return sqrt(_dx)*psi.norm();
+    return sqrt(_dx)*psi.norm2();
 }
 double GPE1D::norm(cvm::cvector &psi) const {
-    return sqrt(_dx)*psi.norm();
+    return sqrt(_dx)*psi.norm2();
 }
 /* }}} */
 /* plot method {{{ */
@@ -509,9 +575,9 @@ void GPE1D::plot(int nmodes, std::string &name) {
     } else
         nmodes=0;
     if(file.is_open()) {
-        const double *psi=_psi.get();
+        const std::complex<double> *psi=_psi.get();
         for(int i=0;i<_n;i++) {
-            file << i*_dx-_xmax << ' ' << psi[i];
+            file << i*_dx-_xmax << ' ' << psi[i].real() << ' ' << psi[i].imag();
             for(int j=0;j<nmodes;j++) {
                 file << ' ' << u[j*_n+i].real()
                     << ' ' << v[j*_n+i].real();
@@ -524,10 +590,9 @@ void GPE1D::plot(int nmodes, std::string &name) {
     }
     std::cout << "set style data lines;"
         << "set xlabel \"x\";set ylabel \"Density\";"
-        << "plot \"/tmp/psi.txt\" using 1:($2*$2) title \"\"";
+        << "plot \"/tmp/psi.txt\" using 1:($2*$2+$3*$3) title \"\"";
     for(int i=0;i<nmodes;i++) {
-        std::cout << ",\"\" using 1:(2*$2*($" << 2*i+3 << "+$" << 2*i+4 << ")) title \"\"";
-        //std::cout << ",\"\" using 1:($" << 2*i+4 << ") title \"\"";
+        std::cout << ",\"\" using 1:(2*$2*($" << 2*i+4 << "+$" << 2*i+5 << ")) title \"\"";
     }
     std::cout << ";pause mouse\n";
     std::cout.flush();
@@ -566,8 +631,18 @@ bool GPE1D::getHeader(std::ifstream &file) {
     return true;
 }
 /* }}} */
+/* computePhase method {{{ */
+void GPE1D::computePhase(std::complex<double> dt) {
+    double scale=1./_n;
+    for(int i=0;i<_n;i++) {
+        double k2=2*(cos((2*pi*i)/_n)-1)/(_dx*_dx);
+        _phase[i]=scale*exp(dt*_kterm*k2);
+    }
+}
+/* }}} */
 /* }}} */
 /* class GPE2D implementation {{{ */
+/* Constructor {{{ */
 GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H) {
     std::cerr << "[I] Initializing a 2D Cartesian system" << std::endl;
     _nx=getConfig(config,string("x2D::nx"),64);
@@ -579,6 +654,7 @@ GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H) {
     int n=_nx*_ny;
     _psi.resize(n);
     _H.resize(n);
+    allocate(n);
     //Only a diagonal part
     VarDef vars;
     vars["X"]=new Constant(0);
@@ -593,15 +669,22 @@ GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H) {
             vars["X"]->set(&x);
             double vpot=*((double*)(pot->evaluate(vars)));
             vpot*=_vterm;
+            _vpot[i]=vpot;
             v[i+j*_nx]=vpot;
             psi[i+j*_nx]=vpot<1?sqrt(1-vpot):0;
         }
     }
     //Assign H diagonal and initial state
     _H.diag(0).assign(v);
-    _psi.assign(psi);
     delete[] v;
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
+    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
+    _planFFT=fftw_plan_dft_3d(1,_ny,_nx,rspace,pspace,FFTW_FORWARD,0);
+    _planIFFT=fftw_plan_dft_3d(1,_ny,_nx,pspace,rspace,FFTW_BACKWARD,0);
+    _psi=cvm::cvector(psi,n);
+    delete[] psi;
 }
+/* }}} */
 /* spectrum method {{{ */
 void GPE2D::spectrum(string &name, int m) {
     std::cerr << "[E] spectrum method NOT implemented for a 2D system !" << std::endl;
@@ -610,10 +693,10 @@ void GPE2D::spectrum(string &name, int m) {
 /* }}} */
 /* norm methods {{{ */
 double GPE2D::norm(cvm::rvector &psi) const {
-    return sqrt(_dx*_dy)*psi.norm();
+    return sqrt(_dx*_dy)*psi.norm2();
 }
 double GPE2D::norm(cvm::cvector &psi) const {
-    return sqrt(_dx*_dy)*psi.norm();
+    return sqrt(_dx*_dy)*psi.norm2();
 }
 /* }}} */
 /* plot method {{{ */
@@ -656,6 +739,19 @@ bool GPE2D::getHeader(std::ifstream &file) {
         return false;
     }
     return true;
+}
+/* }}} */
+/* computePhase method {{{ */
+void GPE2D::computePhase(std::complex<double> dt) {
+    double scale=1./(_nx*_ny);
+    for(int j=0;j<_ny;j++) {
+        double k2y=(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
+        for(int i=0;i<_nx;i++) {
+            double k2x=(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
+            double k2=2*(k2x+k2y);
+            _phase[i+j*_nx]=scale*exp(dt*_kterm*k2);
+        }
+    }
 }
 /* }}} */
 /* }}} */

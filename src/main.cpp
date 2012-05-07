@@ -9,7 +9,6 @@
 #include <fstream>      //For ofstream/ifstream...
 #include <common.h>     //For ConfigMap.
 #include <expression.h> //For Expression, VarDef.
-#include <cvm.h>        //For cvm matrices.
 #include "gpe.h"        //For GPE class (and sub-classes).
 /* mainFunction method {{{ */
 int mainFunction(ConfigMap &config) {
@@ -76,6 +75,12 @@ int mainFunction(ConfigMap &config) {
         range<int> m=getConfig(config,string("spectrum"),def);
         for(int i=m.min;i<=m.max;i+=m.incr)
             gpe->spectrum(log,i);
+    }
+    if(config.find("evolve")!=config.end()) {
+        range<double> def={0.,1.,1e-3};
+        range<double> t=getConfig(config,string("evolve"),def);
+        gpe->evolve(t.min,t.incr,t.max);
+        gpe->save(out);
     }
     return 0;
 };

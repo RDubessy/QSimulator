@@ -1,6 +1,7 @@
 #ifndef GPE_H
 #define GPE_H
 #include <cvm.h>
+#include <fftw3.h>
 /* class GPE {{{ */
 /*!\brief This class describe a Gross-Pitaevskii equation.
  *
@@ -53,13 +54,22 @@ class GPE {
         virtual bool getHeader(std::ifstream &file) =0;
         /*!\brief Correct the hamiltonian for excited states. */
         virtual void correct(cvm::srmatrix &H, int m) {};
+        virtual void doStep(std::complex<double> dt);
+        void evolve(double tstart, double dttest, double tend);
+        void allocate(int n);
+        virtual void computePhase(std::complex<double> dt) {};
     protected:
         cvm::srbmatrix _H;  //!<Single body hamiltonian, stored as a tridiagonal real matrix.
-        cvm::rvector _psi;  //!<Groundstate wave function, stored as a real vector.
+        cvm::cvector _psi;  //!<Groundstate wave function, stored as a complex vector.
         double _gN;         //!<Interaction term.
         double _kterm;      //!<Kinetic term prefactor.
         double _vterm;      //!<Potential term prefactor.
         double _mu;         //!<Chemical potential (or groundstate energy if no interactions).
+        std::complex<double> *_psip;
+        std::complex<double> *_phase;
+        double *_vpot;
+        fftw_plan _planFFT; //!<Resource for forward FFT.
+        fftw_plan _planIFFT;//!<Resource for backward FFT.
 };
 /* }}} */
 /* class Polar1D {{{ */
@@ -89,6 +99,7 @@ class Polar1D : public GPE {
         void setHeader(std::ofstream &file) const;
         bool getHeader(std::ifstream &file);
         void correct(cvm::srmatrix &H, int m);
+        void doStep(std::complex<double> dt);
     private:
         double _rmin;   //!<Minimum allowed radius.
         double _rmax;   //!<Maximum allowed radius.
@@ -114,6 +125,7 @@ class GPE1D : public GPE {
         void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
         bool getHeader(std::ifstream &file);
+        void computePhase(std::complex<double> dt);
     private:
         double _xmax;   //!<Half box size.
         double _dx;     //!<Grid step size.
@@ -131,6 +143,7 @@ class GPE2D : public GPE {
         void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
         bool getHeader(std::ifstream &file);
+        void computePhase(std::complex<double> dt);
     private:
         double _xmax;
         double _ymax;

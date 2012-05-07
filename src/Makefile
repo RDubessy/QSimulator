@@ -4,7 +4,7 @@ CFLAGS += -O3 -ffast-math
 CFLAGS += -Wall
 INC_DIR += /opt/include/
 LIB_DIR += /opt/lib
-LIBS += -lcvm_em64t -loptions -lmathexpr
+LIBS += -lcvm_em64t -loptions -lmathexpr -lfftw3
 all : qsimu
 
 qsimu : gpe.o main.o 
