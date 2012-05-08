@@ -58,6 +58,7 @@ class GPE {
         void evolve(double tstart, double dttest, double tend);
         void allocate(int n);
         virtual void computePhase(std::complex<double> dt) {};
+        virtual void initialize(Expression *pot) =0;
     protected:
         cvm::srbmatrix _H;  //!<Single body hamiltonian, stored as a tridiagonal real matrix.
         cvm::cvector _psi;  //!<Groundstate wave function, stored as a complex vector.
@@ -100,6 +101,7 @@ class Polar1D : public GPE {
         bool getHeader(std::ifstream &file);
         void correct(cvm::srmatrix &H, int m);
         void doStep(std::complex<double> dt);
+        void initialize(Expression *pot);
     private:
         double _rmin;   //!<Minimum allowed radius.
         double _rmax;   //!<Maximum allowed radius.
@@ -126,6 +128,7 @@ class GPE1D : public GPE {
         void setHeader(std::ofstream &file) const;
         bool getHeader(std::ifstream &file);
         void computePhase(std::complex<double> dt);
+        void initialize(Expression *pot);
     private:
         double _xmax;   //!<Half box size.
         double _dx;     //!<Grid step size.
@@ -144,13 +147,33 @@ class GPE2D : public GPE {
         void setHeader(std::ofstream &file) const;
         bool getHeader(std::ifstream &file);
         void computePhase(std::complex<double> dt);
-    private:
-        double _xmax;
-        double _ymax;
+        void initialize(Expression *pot);
+        virtual void initializeFFT();
+    protected:
         double _dx;
         double _dy;
         int _nx;
         int _ny;
+    private:
+        double _xmax;
+        double _ymax;
+};
+/* }}} */
+/* class GPE2DROT {{{ */
+class GPE2DROT : public GPE2D {
+    public:
+        GPE2DROT(ConfigMap &config, Expression *H,
+                Expression *pot);
+        void doStep(std::complex<double> dt);
+        void computePhase(std::complex<double> dt);
+        void initializeFFT();
+    private:
+        double _oterm;          //!<Rotation term.
+        fftw_plan _planFFTxz;   //!<Resource for forward FFT.
+        fftw_plan _planFFTy;    //!<Resource for forward FFT.
+        fftw_plan _planIFFTx;   //!<Resource for backward FFT.
+        fftw_plan _planIFFTyz;  //!<Resource for backward FFT.
+        std::complex<double> *_phase2;//!<Correction to the kinetic energy contribution.
 };
 /* }}} */
 #endif //GPE_H

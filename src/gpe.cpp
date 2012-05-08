@@ -40,6 +40,7 @@ void quickSort(std::complex<double> *v, int first, int last,cvm::scmatrix &evecs
 /* Constructor {{{ */
 GPE::GPE(Expression *H) {
     VarDef vars;
+    vars["LZ"]=&zero;
     //Kinetic term pre-factor
     vars["DELTA"]=&one;
     vars["VEXT"]=&zero;
@@ -321,49 +322,6 @@ Polar1D::Polar1D(ConfigMap &config, Expression *H,
     _H.resize(_n);
     _H.resize_lu(1,1);
     allocate(_n);
-    //Diagonal part
-    VarDef vars;
-    vars["R"]=new Constant(0);
-    double *v=new double[_n];
-    double *psi=new double[_n];
-    for(int i=0;i<_n;i++) {
-        double r=_rmin+i*_dr;
-        vars["R"]->set(&r);
-        double vpot=*((double*)(pot->evaluate(vars)));
-        vpot*=_vterm;
-        _vpot[i]=vpot;
-        v[i]=_kterm*(-2/(_dr*_dr)-_l*_l/(r*r))+vpot;
-        psi[i]=vpot<1?sqrt(1-vpot):0;
-    }
-    //Special case r=0
-    vars["R"]->set(&_rmin);
-    v[0]=*((double*)(pot->evaluate(vars)));
-    v[0]*=_vterm;
-    v[0]+=_kterm*(-1/(_dr*_dr)-_l*_l/(_rmin*_rmin));
-    //Special case r=inf
-    double rmax=_rmin+(_n-1)*_dr;
-    vars["R"]->set(&rmax);
-    v[_n-1]=*((double*)(pot->evaluate(vars)));
-    v[_n-1]*=_vterm;
-    v[_n-1]+=_kterm*(-1/(_dr*_dr)-_l*_l/(rmax*rmax));
-    //Assign H diagonal and initial state
-    _H.diag(0).assign(v);
-    _psi=cvm::cvector(psi,_n);
-    delete[] v;
-    //Upper and Lower diagonals
-    double *vu=new double[_n-1];
-    double *vl=new double[_n-1];
-    for(int i=0;i<_n-1;i++) {
-        double r=_rmin+i*_dr;
-        vu[i]=_kterm*(1./_dr+0.5/r)/_dr;
-        vl[i]=_kterm*(1./_dr-0.5/(r+_dr))/_dr;
-    }
-    //r=0
-    vu[0]=_kterm/(_dr*_dr);
-    _H.diag(1).assign(vu);
-    _H.diag(-1).assign(vl);
-    delete[] vu;
-    delete[] vl;
 }
 /* }}} */
 /* norm methods {{{ */
@@ -495,6 +453,53 @@ void Polar1D::doStep(std::complex<double> dt) {
     _psi+=psi;
 }
 /* }}} */
+/* initialize method {{{ */
+void Polar1D::initialize(Expression *pot) {
+    //Diagonal part
+    VarDef vars;
+    vars["R"]=new Constant(0);
+    double *v=new double[_n];
+    double *psi=new double[_n];
+    for(int i=0;i<_n;i++) {
+        double r=_rmin+i*_dr;
+        vars["R"]->set(&r);
+        double vpot=*((double*)(pot->evaluate(vars)));
+        vpot*=_vterm;
+        _vpot[i]=vpot;
+        v[i]=_kterm*(-2/(_dr*_dr)-_l*_l/(r*r))+vpot;
+        psi[i]=vpot<1?sqrt(1-vpot):0;
+    }
+    //Special case r=0
+    vars["R"]->set(&_rmin);
+    v[0]=*((double*)(pot->evaluate(vars)));
+    v[0]*=_vterm;
+    v[0]+=_kterm*(-1/(_dr*_dr)-_l*_l/(_rmin*_rmin));
+    //Special case r=inf
+    double rmax=_rmin+(_n-1)*_dr;
+    vars["R"]->set(&rmax);
+    v[_n-1]=*((double*)(pot->evaluate(vars)));
+    v[_n-1]*=_vterm;
+    v[_n-1]+=_kterm*(-1/(_dr*_dr)-_l*_l/(rmax*rmax));
+    //Assign H diagonal and initial state
+    _H.diag(0).assign(v);
+    _psi=cvm::cvector(psi,_n);
+    delete[] v;
+    //Upper and Lower diagonals
+    double *vu=new double[_n-1];
+    double *vl=new double[_n-1];
+    for(int i=0;i<_n-1;i++) {
+        double r=_rmin+i*_dr;
+        vu[i]=_kterm*(1./_dr+0.5/r)/_dr;
+        vl[i]=_kterm*(1./_dr-0.5/(r+_dr))/_dr;
+    }
+    //r=0
+    vu[0]=_kterm/(_dr*_dr);
+    _H.diag(1).assign(vu);
+    _H.diag(-1).assign(vl);
+    delete[] vu;
+    delete[] vl;
+}
+/* }}} */
 /* }}} */
 /* class GPE1D implementation {{{ */        
 /* Constructor {{{ */
@@ -509,40 +514,6 @@ GPE1D::GPE1D(ConfigMap &config, Expression *H,
     _H.resize(_n);
     _H.resize_lu(1,1);
     allocate(_n);
-    //Diagonal part
-    VarDef vars;
-    vars["X"]=new Constant(0);
-    double *v=new double[_n];
-    double *psi=new double[_n];
-    for(int i=0;i<_n;i++) {
-        double x=i*_dx-_xmax;
-        vars["X"]->set(&x);
-        double vpot=*((double*)(pot->evaluate(vars)));
-        vpot*=_vterm;
-        _vpot[i]=vpot;
-        v[i]=_kterm*(-2/(_dx*_dx))+vpot;
-        psi[i]=vpot<1?sqrt(1-vpot):0;
-    }
-    _H.diag(0).assign(v);
-    delete[] v;
-    //Upper and lower diagonal
-    double *vu=new double[_n-1];
-    double *vl=new double[_n-1];
-    for(int i=0;i<_n-1;i++) {
-        vu[i]=_kterm/(_dx*_dx);
-        vl[i]=vu[i];
-    }
-    _H.diag(1).assign(vu);
-    _H.diag(-1).assign(vl);
-    delete[] vu;
-    delete[] vl;
-    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
-    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
-    _planFFT=fftw_plan_dft_3d(1,1,_n,rspace,pspace,FFTW_FORWARD,0);
-    _planIFFT=fftw_plan_dft_3d(1,1,_n,pspace,rspace,FFTW_BACKWARD,0);
-    //Copy initial state into memory
-    _psi=cvm::cvector(psi,_n);
-    delete[] psi;
 }
 /* }}} */
 /* norm methods {{{ */
@@ -640,6 +611,44 @@ void GPE1D::computePhase(std::complex<double> dt) {
     }
 }
 /* }}} */
+/* initialize method {{{ */
+void GPE1D::initialize(Expression *pot) {
+    //Diagonal part
+    VarDef vars;
+    vars["X"]=new Constant(0);
+    double *v=new double[_n];
+    double *psi=new double[_n];
+    for(int i=0;i<_n;i++) {
+        double x=i*_dx-_xmax;
+        vars["X"]->set(&x);
+        double vpot=*((double*)(pot->evaluate(vars)));
+        vpot*=_vterm;
+        _vpot[i]=vpot;
+        v[i]=_kterm*(-2/(_dx*_dx))+vpot;
+        psi[i]=vpot<1?sqrt(1-vpot):0;
+    }
+    _H.diag(0).assign(v);
+    delete[] v;
+    //Upper and lower diagonal
+    double *vu=new double[_n-1];
+    double *vl=new double[_n-1];
+    for(int i=0;i<_n-1;i++) {
+        vu[i]=_kterm/(_dx*_dx);
+        vl[i]=vu[i];
+    }
+    _H.diag(1).assign(vu);
+    _H.diag(-1).assign(vl);
+    delete[] vu;
+    delete[] vl;
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
+    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
+    _planFFT=fftw_plan_dft_3d(1,1,_n,rspace,pspace,FFTW_FORWARD,0);
+    _planIFFT=fftw_plan_dft_3d(1,1,_n,pspace,rspace,FFTW_BACKWARD,0);
+    //Copy initial state into memory
+    _psi=cvm::cvector(psi,_n);
+    delete[] psi;
+}
+/* }}} */
 /* }}} */
 /* class GPE2D implementation {{{ */
 /* Constructor {{{ */
@@ -657,34 +666,6 @@ GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H) {
     _psi.resize(n);
     _H.resize(n);
     allocate(n);
-    //Only a diagonal part
-    VarDef vars;
-    vars["X"]=new Constant(0);
-    vars["Y"]=new Constant(0);
-    double *v=new double[n];
-    double *psi=new double[n];
-    for(int j=0;j<_ny;j++) {
-        double y=j*_dy-_ymax;
-        vars["Y"]->set(&y);
-        for(int i=0;i<_nx;i++) {
-            double x=i*_dx-_xmax;
-            vars["X"]->set(&x);
-            double vpot=*((double*)(pot->evaluate(vars)));
-            vpot*=_vterm;
-            _vpot[i+j*_nx]=vpot;
-            v[i+j*_nx]=vpot;
-            psi[i+j*_nx]=vpot<1?sqrt(1-vpot):0;
-        }
-    }
-    //Assign H diagonal and initial state
-    _H.diag(0).assign(v);
-    delete[] v;
-    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
-    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
-    _planFFT=fftw_plan_dft_3d(1,_ny,_nx,rspace,pspace,FFTW_FORWARD,0);
-    _planIFFT=fftw_plan_dft_3d(1,_ny,_nx,pspace,rspace,FFTW_BACKWARD,0);
-    _psi=cvm::cvector(psi,n);
-    delete[] psi;
 }
 /* }}} */
 /* spectrum method {{{ */
@@ -779,6 +760,134 @@ void GPE2D::computePhase(std::complex<double> dt) {
             _phase[i+j*_nx]=scale*exp(dt*_kterm*k2);
         }
     }
+}
+/* }}} */
+/* initialize method {{{ */
+void GPE2D::initialize(Expression *pot) {
+    //Only a diagonal part
+    VarDef vars;
+    vars["X"]=new Constant(0);
+    vars["Y"]=new Constant(0);
+    int n=_nx*_ny;
+    double *v=new double[n];
+    double *psi=new double[n];
+    for(int j=0;j<_ny;j++) {
+        double y=j*_dy-_ymax;
+        vars["Y"]->set(&y);
+        for(int i=0;i<_nx;i++) {
+            double x=i*_dx-_xmax;
+            vars["X"]->set(&x);
+            double vpot=*((double*)(pot->evaluate(vars)));
+            vpot*=_vterm;
+            _vpot[i+j*_nx]=vpot;
+            v[i+j*_nx]=vpot;
+            psi[i+j*_nx]=vpot<1?sqrt(1-vpot):0;
+        }
+    }
+    //Assign H diagonal and initial state
+    _H.diag(0).assign(v);
+    delete[] v;
+    initializeFFT();
+    _psi=cvm::cvector(psi,n);
+    delete[] psi;
+}
+/* }}} */
+/* initializeFFT method {{{ */
+void GPE2D::initializeFFT() {
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
+    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
+    _planFFT=fftw_plan_dft_3d(1,_ny,_nx,rspace,pspace,FFTW_FORWARD,0);
+    _planIFFT=fftw_plan_dft_3d(1,_ny,_nx,pspace,rspace,FFTW_BACKWARD,0);
+}
+/* }}} */
+/* }}} */
+/* class GPE2DROT implementation {{{ */
+/* Constructor {{{ */
+GPE2DROT::GPE2DROT(ConfigMap &config, Expression *H, Expression *pot) : GPE2D(config,H,pot) {
+    _phase2=new std::complex<double>[_nx*_ny];
+    VarDef vars;
+    //Rotation term pre-factor
+    vars["LZ"]=&one;
+    vars["DELTA"]=&zero;
+    vars["VEXT"]=&zero;
+    vars["RHO"]=&zero;
+    _oterm=*((double*)(H->evaluate(vars)));
+}
+/* }}} */
+/* initializeFFT method {{{ */
+void GPE2DROT::initializeFFT() {
+    std::cerr << "[I] FFT in Rotating Frame" << std::endl;
+    //Initialize the plans for fast fourier transform
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
+    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
+    fftw_iodim dimx,dimy,dimz;
+    dimz.n=1;
+    dimz.is=_nx*_ny;
+    dimz.os=_nx*_ny;
+    dimy.n=_ny;
+    dimy.is=_nx;
+    dimy.os=_nx;
+    dimx.n=_nx;
+    dimx.is=1;
+    dimx.os=1;
+    fftw_iodim dims[2];
+    fftw_iodim hdims[2];
+    //Transform x-z
+    dims[0]=dimz;
+    dims[1]=dimx;
+    hdims[0]=dimy;
+    _planFFTxz=fftw_plan_guru_dft(2,dims,1,hdims,rspace,pspace,FFTW_FORWARD,0);
+    //Transform y
+    dims[0]=dimy;
+    hdims[0]=dimz;
+    hdims[1]=dimx;
+    _planFFTy=fftw_plan_guru_dft(1,dims,2,hdims,pspace,pspace,FFTW_FORWARD,0);
+    //Inverse transform x
+    dims[0]=dimx;
+    hdims[0]=dimz;
+    hdims[1]=dimy;
+    _planIFFTx=fftw_plan_guru_dft(1,dims,2,hdims,pspace,pspace,FFTW_BACKWARD,0);
+    //Inverse transform y-z
+    dims[0]=dimz;
+    dims[1]=dimy;
+    hdims[0]=dimx;
+    _planIFFTyz=fftw_plan_guru_dft(2,dims,1,hdims,pspace,rspace,FFTW_BACKWARD,0);
+}
+/* }}} */
+/* computePhase method {{{ */
+void GPE2DROT::computePhase(std::complex<double> dt) {
+    double scale=1./(_nx*_ny);
+    double xo=0.5*(_nx-1);
+    double yo=0.5*(_ny-1);
+    for(int j=0;j<_ny;j++) {
+        double y=j-yo;
+        double k2y=2*(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
+        double ky=sin((2*pi*j)/_ny);
+        for(int i=0;i<_nx;i++) {
+            double x=i-xo;
+            double k2x=2*(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
+            double kx=sin((2*pi*i)/_nx);
+            _phase[i+j*_nx]=scale*exp(dt*(_kterm*k2x-_oterm*y*kx));
+            _phase2[i+j*_nx]=exp(dt*(_kterm*k2y+_oterm*x*ky));
+        }
+    }
+    return;
+}
+/* }}} */
+/* doStep method {{{ */
+void GPE2DROT::doStep(std::complex<double> dt) {
+    int n=_psi.size();
+    std::complex<double> *v=_psi.get();
+    for(int i=0;i<n;i++)
+        v[i]*=std::exp(dt*(_vpot[i]+_gN*std::norm(v[i])-_mu));
+    fftw_execute(_planFFTxz);
+    for(int i=0;i<n;i++)
+        _psip[i]*=_phase[i];
+    fftw_execute(_planFFTy);
+    fftw_execute(_planIFFTx);
+    for(int i=0;i<n;i++)
+        _psip[i]*=_phase2[i];
+    fftw_execute(_planIFFTyz);
 }
 /* }}} */
 /* }}} */

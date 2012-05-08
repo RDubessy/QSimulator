@@ -39,12 +39,16 @@ int mainFunction(ConfigMap &config) {
     } else if(config["general::type"]=="Cartesian1D") {
         gpe=new GPE1D(config,eqn,pot);
     } else if(config["general::type"]=="Cartesian2D") {
-        gpe=new GPE2D(config,eqn,pot);
+        if(config["general::equation"].find("LZ")!=string::npos)
+            gpe=new GPE2DROT(config,eqn,pot);
+        else
+            gpe=new GPE2D(config,eqn,pot);
     }
     if(gpe==0) {
         std::cerr << "[E] Unknown problem type!" << std::endl;
         return -1;
     }
+    gpe->initialize(pot);
     if(config["in"].size()>0) {
         gpe->load(config["in"]);
     }
