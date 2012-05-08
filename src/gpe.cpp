@@ -647,10 +647,12 @@ GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H) {
     std::cerr << "[I] Initializing a 2D Cartesian system" << std::endl;
     _nx=getConfig(config,string("x2D::nx"),64);
     _ny=getConfig(config,string("x2D::ny"),_nx);
-    _xmax=getConfig(config,string("x2D::xmax"),1.);
-    _ymax=getConfig(config,string("x2D::ymax"),_xmax);
-    _dx=2*_xmax/(_nx-1);
-    _dy=2*_ymax/(_ny-1);
+    _xmax=getConfig(config,string("x2D::Lx"),1.);
+    _ymax=getConfig(config,string("x2D::Ly"),_xmax);
+    _dx=_xmax/(_nx-1);
+    _dy=_ymax/(_ny-1);
+    _xmax/=2;
+    _ymax/=2;
     int n=_nx*_ny;
     _psi.resize(n);
     _H.resize(n);
@@ -669,7 +671,7 @@ GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H) {
             vars["X"]->set(&x);
             double vpot=*((double*)(pot->evaluate(vars)));
             vpot*=_vterm;
-            _vpot[i]=vpot;
+            _vpot[i+j*_nx]=vpot;
             v[i+j*_nx]=vpot;
             psi[i+j*_nx]=vpot<1?sqrt(1-vpot):0;
         }
@@ -701,6 +703,31 @@ double GPE2D::norm(cvm::cvector &psi) const {
 /* }}} */
 /* plot method {{{ */
 void GPE2D::plot(int nmode, std::string &name) {
+    std::ofstream file("/tmp/psi.txt");
+    std::ifstream spectrum(name.c_str());
+    if(file.is_open()) {
+        const std::complex<double> *psi=_psi.get();
+        for(int j=0;j<_ny;j++) {
+            for(int i=0;i<_nx;i++) {
+                file << i*_dx-_xmax << ' ' << j*_dy-_ymax << ' '
+                    << psi[i+j*_nx].real() << ' ' << psi[i+j*_nx].imag()
+                    << '\n';
+            }
+            file << '\n';
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file \"/tmp/psi.txt\" !" << std::endl;
+    }
+    std::cout << "set view map;unset surface;set pm3d;unset key;"
+        << "set size square;set size 1,1;set origin 0,0;"
+        << "set multiplot layout 1,2;"
+        << "splot \"/tmp/psi.txt\" using 1:2:($3*$3+$4*$4);"
+        << "splot \"/tmp/psi.txt\" using 1:2:(arg($3+{0,1}*$4)+pi);"
+        << "unset multiplot;"
+        << "pause mouse\n";
+    std::cout.flush();
+    return;
 }
 /* }}} */
 /* setHeader method {{{ */
