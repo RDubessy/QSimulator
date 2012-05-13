@@ -55,7 +55,7 @@ class GPE {
         /*!\brief Correct the hamiltonian for excited states. */
         virtual void correct(cvm::srmatrix &H, int m) {};
         virtual void doStep(std::complex<double> dt);
-        void evolve(double tstart, double dttest, double tend);
+        void evolve(double tstart, double dttest, double tend, std::string &name);
         void allocate(int n);
         virtual void computePhase(std::complex<double> dt) {};
         virtual void initialize(Expression *pot) =0;

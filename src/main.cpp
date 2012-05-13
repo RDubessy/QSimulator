@@ -83,8 +83,7 @@ int mainFunction(ConfigMap &config) {
     if(config.find("evolve")!=config.end()) {
         range<double> def={0.,1.,1e-3};
         range<double> t=getConfig(config,string("evolve"),def);
-        gpe->evolve(t.min,t.incr,t.max);
-        gpe->save(out);
+        gpe->evolve(t.min,t.incr,t.max,out);
     }
     return 0;
 };

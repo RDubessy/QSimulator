@@ -286,15 +286,20 @@ void GPE::doStep(std::complex<double> dt) {
 }
 /* }}} */
 /* evolve method {{{ */
-void GPE::evolve(double tstart, double dttest, double tend) {
+void GPE::evolve(double tstart, double dttest, double tend, std::string &name) {
     double t=tstart;
     std::complex<double> dt=std::complex<double>(0,-dttest);
     int c=0;
     computePhase(dt);
     while(t<tend) {
         doStep(dt);
-        if(c%10000==0)
-            std::cerr << c << ' ' << norm(_psi) << ' ' << _psi.get()[128] << std::endl;
+        if(c%1000==0) {
+            std::cerr << c << ' ' << norm(_psi) << std::endl;
+            std::ostringstream file;
+            file << name << "_t" << t;
+            std::string filename=file.str();
+            save(filename);
+        }
         t+=dttest;
         c++;
     }
