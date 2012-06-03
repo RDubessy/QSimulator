@@ -2,7 +2,8 @@
 all:
 	cd src && make all
 	make tools
-	make doc
+install:
+	mv bin/qsimu /usr/local/bin/qsimu
 tools:
 	cd tools && make all
 doc:

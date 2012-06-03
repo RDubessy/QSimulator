@@ -2,6 +2,9 @@
 #define GPE_H
 #include <cvm.h>
 #include <fftw3.h>
+enum state {
+    ok,error,converted
+};
 /* class GPE {{{ */
 /*!\brief This class describe a Gross-Pitaevskii equation.
  *
@@ -31,7 +34,7 @@
 class GPE {
     public:
         /*!\brief Constructor. */
-        GPE(Expression *H);
+        GPE(Expression *H, Expression *pot);
         /*!\brief Computes the groundstate wave function of the system. */
         void findGroundState(double dttest, double tol, double dttol, string &name);
         /*!\brief Computes the Bogolyubov spectrum of the system. */
@@ -51,7 +54,7 @@ class GPE {
         /*!\brief Write the header of an output file. */
         virtual void setHeader(std::ofstream &file) const=0;
         /*!\brief Get the header from an input file. */
-        virtual bool getHeader(std::ifstream &file) =0;
+        virtual state getHeader(std::ifstream &file) =0;
         /*!\brief Correct the hamiltonian for excited states. */
         virtual void correct(cvm::srmatrix &H, int m) {};
         virtual void doStep(std::complex<double> dt);
@@ -59,8 +62,12 @@ class GPE {
         void allocate(int n);
         virtual void computePhase(std::complex<double> dt) {};
         virtual void initialize(Expression *pot) =0;
+        virtual void update(double t);
+        virtual std::string measure();
+        virtual double epot();
+        virtual double ekin() { return 0; };
     protected:
-        cvm::srbmatrix _H;  //!<Single body hamiltonian, stored as a tridiagonal real matrix.
+        cvm::srbmatrix _H0;  //!<Single body hamiltonian, stored as a tridiagonal real matrix.
         cvm::cvector _psi;  //!<Groundstate wave function, stored as a complex vector.
         double _gN;         //!<Interaction term.
         double _kterm;      //!<Kinetic term prefactor.
@@ -71,6 +78,9 @@ class GPE {
         double *_vpot;
         fftw_plan _planFFT; //!<Resource for forward FFT.
         fftw_plan _planIFFT;//!<Resource for backward FFT.
+        Expression *_H;
+    private:
+        Expression *_pot;
 };
 /* }}} */
 /* class Polar1D {{{ */
@@ -98,7 +108,7 @@ class Polar1D : public GPE {
         double norm(cvm::cvector &psi) const;
         void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
-        bool getHeader(std::ifstream &file);
+        state getHeader(std::ifstream &file);
         void correct(cvm::srmatrix &H, int m);
         void doStep(std::complex<double> dt);
         void initialize(Expression *pot);
@@ -126,7 +136,7 @@ class GPE1D : public GPE {
         double norm(cvm::cvector &psi) const;
         void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
-        bool getHeader(std::ifstream &file);
+        state getHeader(std::ifstream &file);
         void computePhase(std::complex<double> dt);
         void initialize(Expression *pot);
     private:
@@ -145,10 +155,11 @@ class GPE2D : public GPE {
         double norm(cvm::cvector &psi) const;
         void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
-        bool getHeader(std::ifstream &file);
+        state getHeader(std::ifstream &file);
         void computePhase(std::complex<double> dt);
         void initialize(Expression *pot);
         virtual void initializeFFT();
+        double ekin();
     protected:
         double _dx;
         double _dy;
@@ -167,6 +178,8 @@ class GPE2DROT : public GPE2D {
         void doStep(std::complex<double> dt);
         void computePhase(std::complex<double> dt);
         void initializeFFT();
+        void update(double dt);
+        std::string measure();
     private:
         double _oterm;          //!<Rotation term.
         fftw_plan _planFFTxz;   //!<Resource for forward FFT.

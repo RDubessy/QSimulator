@@ -1,6 +1,7 @@
 #include <common.h>
 #include <expression.h>
 #include <fstream>
+#include <iomanip>
 #include "gpe.h"
 Constant zero(0);
 Constant one(1);
@@ -38,24 +39,13 @@ void quickSort(std::complex<double> *v, int first, int last,cvm::scmatrix &evecs
 /* }}} */
 /* class GPE implementation {{{ */
 /* Constructor {{{ */
-GPE::GPE(Expression *H) {
-    VarDef vars;
-    vars["LZ"]=&zero;
-    //Kinetic term pre-factor
-    vars["DELTA"]=&one;
-    vars["VEXT"]=&zero;
-    vars["RHO"]=&zero;
-    _kterm=*((double*)(H->evaluate(vars)));
-    //Interaction term pre-factor
-    vars["DELTA"]=&zero;
-    vars["VEXT"]=&zero;
-    vars["RHO"]=&one;
-    _gN=*((double*)(H->evaluate(vars)));
-    //Potential term pre-factor
-    vars["DELTA"]=&zero;
-    vars["VEXT"]=&one;
-    vars["RHO"]=&zero;
-    _vterm=*((double*)(H->evaluate(vars)));
+GPE::GPE(Expression *H, Expression *pot) {
+    _H=H;
+    _pot=pot;
+    _vpot=0;
+    update(0);
+    _psip=0;
+    _phase=0;
     _vpot=0;
 }
 /* }}} */
@@ -147,8 +137,8 @@ void GPE::spectrum(string &name, int m) {
     cvm::srmatrix B(H,1,n+1,n);
     cvm::srmatrix C(H,n+1,1,n);
     cvm::srmatrix D(H,n+1,n+1,n);
-    A+=_H;
-    D-=_H;
+    A+=_H0;
+    D-=_H0;
     double *psi2=new double[n];
     double *d=new double[n];
     std::complex<double> *v=_psi.get();
@@ -253,20 +243,26 @@ void GPE::save(std::string &name) const {
 void GPE::load(std::string &name) {
     std::ifstream file(name.c_str(),std::ifstream::binary);
     if(file.is_open()) {
-        if(!getHeader(file))
-            return;
-        std::complex<double> *v=_psi.get();
-        int n=_psi.size();
-        std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << n << ")" << std::endl;
-        for(int i=0;i<n;i++) {
-            file.read((char*)&(v[i].real()),sizeof(double));
+        switch(getHeader(file)) {
+            case ok:
+                {
+                    std::complex<double> *v=_psi.get();
+                    int n=_psi.size();
+                    std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << n << ")" << std::endl;
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(v[i].real()),sizeof(double));
+                    }
+                    if(!file.eof()) {
+                        for(int i=0;i<n;i++) {
+                            file.read((char*)&(v[i].imag()),sizeof(double));
+                        }
+                    }
+                }
+            case error:
+            case converted:
+            default:
+                file.close();
         }
-        if(!file.eof()) {
-            for(int i=0;i<n;i++) {
-                file.read((char*)&(v[i].imag()),sizeof(double));
-            }
-        }
-        file.close();
     } else {
         std::cerr << "[E] Can't open file:" << name << std::endl;
     }
@@ -290,17 +286,25 @@ void GPE::evolve(double tstart, double dttest, double tend, std::string &name) {
     double t=tstart;
     std::complex<double> dt=std::complex<double>(0,-dttest);
     int c=0;
+    update(t);
     computePhase(dt);
     while(t<tend) {
         doStep(dt);
+        if(c%100==0) {
+            std::cout << t << ' ' << norm(_psi)
+                << ' ' << measure()
+                << '\n';
+        }
         if(c%1000==0) {
-            std::cerr << c << ' ' << norm(_psi) << std::endl;
+            std::cout.flush();
             std::ostringstream file;
-            file << name << "_t" << t;
+            file << name << "_t" << std::setfill('0') << std::setw(4) << t;
             std::string filename=file.str();
             save(filename);
         }
         t+=dttest;
+        //update(t);
+        //computePhase(dt);
         c++;
     }
 }
@@ -312,11 +316,56 @@ void GPE::allocate(int n) {
     _vpot=new double[n];
 }
 /* }}} */
+/* update method {{{ */
+void GPE::update(double t) {
+    VarDef vars;
+    vars["LZ"]=&zero;
+    vars["t_"]=new Constant(t);
+    //Kinetic term pre-factor
+    vars["DELTA"]=&one;
+    vars["VEXT"]=&zero;
+    vars["RHO"]=&zero;
+    _kterm=*((double*)(_H->evaluate(vars)));
+    //Interaction term pre-factor
+    vars["DELTA"]=&zero;
+    vars["VEXT"]=&zero;
+    vars["RHO"]=&one;
+    _gN=*((double*)(_H->evaluate(vars)));
+    //Potential term pre-factor
+    vars["DELTA"]=&zero;
+    vars["VEXT"]=&one;
+    vars["RHO"]=&zero;
+    _vterm=*((double*)(_H->evaluate(vars)));
+}
+
+/* }}} */
+/* measure method {{{ */
+std::string GPE::measure() {
+    std::ostringstream mes;
+    mes << epot() << ' ' << ekin();
+    std::string res=mes.str();
+    return res;
+}
+/* }}} */
+/* epot method {{{ */
+double GPE::epot() {
+    double res=0.;
+    double n2=0.;
+    int n=_psi.size();
+    std::complex<double> *v=_psi.get();
+    for(int i=0;i<n;i++) {
+        double v2=std::norm(v[i]);
+        res+=v2*(_vpot[i]+_gN*v2/2);
+        n2+=v2;
+    }
+    return res/n2;
+}
+/* }}} */
 /* }}} */
 /* class Polar1D implementation {{{ */ 
 /* Constructor {{{ */
 Polar1D::Polar1D(ConfigMap &config, Expression *H,
-        Expression *pot) : GPE(H) {
+        Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 1D Polar system" << std::endl;
     _n=getConfig(config,string("polar::n"),64);
     _rmin=getConfig(config,string("polar::rmin"),0.01);
@@ -324,8 +373,8 @@ Polar1D::Polar1D(ConfigMap &config, Expression *H,
     _dr=(_rmax-_rmin)/(_n-1);
     _l=getConfig(config,string("polar::l"),0);
     _psi.resize(_n);
-    _H.resize(_n);
-    _H.resize_lu(1,1);
+    _H0.resize(_n);
+    _H0.resize_lu(1,1);
     allocate(_n);
 }
 /* }}} */
@@ -355,7 +404,7 @@ void Polar1D::plot(int nmodes, std::string &name) {
     std::ifstream spectrum(name.c_str());
     std::complex<double> *u=0;
     std::complex<double> *v=0;
-    if(nmodes>0 && spectrum.is_open() && getHeader(spectrum)) {
+    if(nmodes>0 && spectrum.is_open() && (getHeader(spectrum)==ok)) {
         std::cerr << "[I] Found matching spectrum file" << std::endl;
         u=new std::complex<double>[_n*_n];
         v=new std::complex<double>[_n*_n];
@@ -402,29 +451,31 @@ void Polar1D::setHeader(std::ofstream &file) const {
     file.write((const char*)&_n,sizeof(int));
     file.write((const char*)&_rmin,sizeof(double));
     file.write((const char*)&_dr,sizeof(double));
+    file.write((char*)&_l,sizeof(int));
     file.write((const char*)&_mu,sizeof(double));
 }
 /* }}} */
 /* getHeader method {{{ */
-bool Polar1D::getHeader(std::ifstream &file) {
+state Polar1D::getHeader(std::ifstream &file) {
     char type[3];
     double mu,dr,rmin;
-    int n;
+    int n,l;
     file.read((char*)type,3*sizeof(char));
+    if(type[0]!='P' || type[1]!='o' || type[2]!='l') {
+        std::cerr << "[E] Incompatible type !" << std::endl;
+        return error;
+    }
     file.read((char*)&n,sizeof(int));
     file.read((char*)&rmin,sizeof(double));
     file.read((char*)&dr,sizeof(double));
+    file.read((char*)&l,sizeof(int));
     file.read((char*)&mu,sizeof(double));
     _mu=mu;
-    if(type[0]!='P' || type[1]!='o' || type[2]!='l') {
-        std::cerr << "[E] Incompatible type !" << std::endl;
-        return false;
-    }
     if(n!=_n) {
         std::cerr << "[E] Incompatible size !" << std::endl;
-        return false;
+        return error;
     }
-    return true;
+    return ok;
 }
 /* }}} */
 /* correct method {{{ */
@@ -449,8 +500,8 @@ void Polar1D::doStep(std::complex<double> dt) {
     std::complex<double> *v=psi.get();
     std::complex <double> *_v=_psi.get();
     psi=_psi;
-    _psi.real()=_H*psi.real();
-    _psi.imag()=_H*psi.imag();
+    _psi.real()=_H0*psi.real();
+    _psi.imag()=_H0*psi.imag();
     //Computes the interaction term
     for(int i=0;i<n;i++)
         _v[i]+=std::norm(v[i])*v[i]*_gN;
@@ -486,7 +537,7 @@ void Polar1D::initialize(Expression *pot) {
     v[_n-1]*=_vterm;
     v[_n-1]+=_kterm*(-1/(_dr*_dr)-_l*_l/(rmax*rmax));
     //Assign H diagonal and initial state
-    _H.diag(0).assign(v);
+    _H0.diag(0).assign(v);
     _psi=cvm::cvector(psi,_n);
     delete[] v;
     //Upper and Lower diagonals
@@ -499,8 +550,8 @@ void Polar1D::initialize(Expression *pot) {
     }
     //r=0
     vu[0]=_kterm/(_dr*_dr);
-    _H.diag(1).assign(vu);
-    _H.diag(-1).assign(vl);
+    _H0.diag(1).assign(vu);
+    _H0.diag(-1).assign(vl);
     delete[] vu;
     delete[] vl;
 }
@@ -509,15 +560,15 @@ void Polar1D::initialize(Expression *pot) {
 /* class GPE1D implementation {{{ */        
 /* Constructor {{{ */
 GPE1D::GPE1D(ConfigMap &config, Expression *H,
-        Expression *pot) : GPE(H) {
+        Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 1D Cartesian system" << std::endl;
     _n=getConfig(config,string("x1D::n"),64);
     _xmax=getConfig(config,string("x1D::L"),0.01);
     _dx=_xmax/(_n-1);
     _xmax/=2;
     _psi.resize(_n);
-    _H.resize(_n);
-    _H.resize_lu(1,1);
+    _H0.resize(_n);
+    _H0.resize_lu(1,1);
     allocate(_n);
 }
 /* }}} */
@@ -535,7 +586,7 @@ void GPE1D::plot(int nmodes, std::string &name) {
     std::ifstream spectrum(name.c_str());
     std::complex<double> *u=0;
     std::complex<double> *v=0;
-    if(nmodes>0 && spectrum.is_open() && getHeader(spectrum)) {
+    if(nmodes>0 && spectrum.is_open() && (getHeader(spectrum)==ok)) {
         std::cerr << "[I] Found matching spectrum file" << std::endl;
         u=new std::complex<double>[_n*_n];
         v=new std::complex<double>[_n*_n];
@@ -586,25 +637,25 @@ void GPE1D::setHeader(std::ofstream &file) const {
 }
 /* }}} */
 /* getHeader method {{{ */
-bool GPE1D::getHeader(std::ifstream &file) {
+state GPE1D::getHeader(std::ifstream &file) {
     char type[3];
     double mu,dx,xmax;
     int n;
     file.read((char*)type,3*sizeof(char));
+    if(type[0]!='x' || type[1]!='1' || type[2]!='D') {
+        std::cerr << "[E] Incompatible type !" << std::endl;
+        return error;
+    }
     file.read((char*)&n,sizeof(int));
     file.read((char*)&xmax,sizeof(double));
     file.read((char*)&dx,sizeof(double));
     file.read((char*)&mu,sizeof(double));
     _mu=mu;
-    if(type[0]!='x' || type[1]!='1' || type[2]!='D') {
-        std::cerr << "[E] Incompatible type !" << std::endl;
-        return false;
-    }
     if(n!=_n) {
         std::cerr << "[E] Incompatible size !" << std::endl;
-        return false;
+        return error;
     }
-    return true;
+    return ok;
 }
 /* }}} */
 /* computePhase method {{{ */
@@ -632,7 +683,7 @@ void GPE1D::initialize(Expression *pot) {
         v[i]=_kterm*(-2/(_dx*_dx))+vpot;
         psi[i]=vpot<1?sqrt(1-vpot):0;
     }
-    _H.diag(0).assign(v);
+    _H0.diag(0).assign(v);
     delete[] v;
     //Upper and lower diagonal
     double *vu=new double[_n-1];
@@ -641,8 +692,8 @@ void GPE1D::initialize(Expression *pot) {
         vu[i]=_kterm/(_dx*_dx);
         vl[i]=vu[i];
     }
-    _H.diag(1).assign(vu);
-    _H.diag(-1).assign(vl);
+    _H0.diag(1).assign(vu);
+    _H0.diag(-1).assign(vl);
     delete[] vu;
     delete[] vl;
     fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
@@ -657,7 +708,7 @@ void GPE1D::initialize(Expression *pot) {
 /* }}} */
 /* class GPE2D implementation {{{ */
 /* Constructor {{{ */
-GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H) {
+GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 2D Cartesian system" << std::endl;
     _nx=getConfig(config,string("x2D::nx"),64);
     _ny=getConfig(config,string("x2D::ny"),_nx);
@@ -669,7 +720,7 @@ GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H) {
     _ymax/=2;
     int n=_nx*_ny;
     _psi.resize(n);
-    _H.resize(n);
+    _H0.resize(n);
     allocate(n);
 }
 /* }}} */
@@ -730,28 +781,67 @@ void GPE2D::setHeader(std::ofstream &file) const {
 }
 /* }}} */
 /* getHeader method {{{ */
-bool GPE2D::getHeader(std::ifstream &file) {
+state GPE2D::getHeader(std::ifstream &file) {
     char type[3];
-    double mu,dx,xmax,dy,ymax;
-    int nx,ny;
     file.read((char*)type,3*sizeof(char));
-    file.read((char*)&nx,sizeof(int));
-    file.read((char*)&ny,sizeof(int));
-    file.read((char*)&xmax,sizeof(double));
-    file.read((char*)&ymax,sizeof(double));
-    file.read((char*)&dx,sizeof(double));
-    file.read((char*)&dy,sizeof(double));
-    file.read((char*)&mu,sizeof(double));
-    _mu=mu;
-    if(type[0]!='x' || type[1]!='2' || type[2]!='D') {
+    if(type[0]=='x' && type[1]=='2' && type[2]=='D') {
+        double mu,dx,xmax,dy,ymax;
+        int nx,ny;
+        file.read((char*)&nx,sizeof(int));
+        file.read((char*)&ny,sizeof(int));
+        file.read((char*)&xmax,sizeof(double));
+        file.read((char*)&ymax,sizeof(double));
+        file.read((char*)&dx,sizeof(double));
+        file.read((char*)&dy,sizeof(double));
+        file.read((char*)&mu,sizeof(double));
+        _mu=mu;
+        if(nx!=_nx || ny!=_ny) {
+            std::cerr << "[E] Incompatible size !" << std::endl;
+            return error;
+        }
+    } else if(type[0]=='P' || type[1]=='o' || type[2]=='l') { //Convert from Polar1D
+        std::cerr << "[I] Converting from polar coordinates" << std::endl;
+        int n,l;
+        double rmin,dr,mu;
+        file.read((char*)&n,sizeof(int));
+        file.read((char*)&rmin,sizeof(double));
+        file.read((char*)&dr,sizeof(double));
+        file.read((char*)&l,sizeof(int));
+        file.read((char*)&mu,sizeof(double));
+        std::complex<double> *v=new std::complex<double>[n];
+        for(int i=0;i<n;i++) {
+            file.read((char*)&(v[i].real()),sizeof(double));
+        }
+        if(!file.eof()) {
+            for(int i=0;i<n;i++) {
+                file.read((char*)&(v[i].imag()),sizeof(double));
+            }
+        }
+        _mu=mu;
+        std::complex<double> *w=_psi.get();
+        double xo=0.5*(_nx-1);
+        double yo=0.5*(_ny-1);
+        double rmax=rmin+(n-1)*dr;
+        for(int j=0;j<_ny;j++) {
+            double y=_dy*(j-yo);
+            for(int i=0;i<_nx;i++) {
+                double x=_dx*(i-xo);
+                double r=sqrt(x*x+y*y);
+                if(r<rmin || r>rmax)
+                    w[i+j*_nx]=0;
+                else {
+                    double theta=atan(y/x);
+                    w[i+j*_nx]=v[(int)((r-rmin)/dr)]*std::exp(std::complex<double>(0,l*theta));
+                }
+            }
+        }
+        normalize();
+        return converted;
+    } else {
         std::cerr << "[E] Incompatible type !" << std::endl;
-        return false;
+        return error;
     }
-    if(nx!=_nx || ny!=_ny) {
-        std::cerr << "[E] Incompatible size !" << std::endl;
-        return false;
-    }
-    return true;
+    return ok;
 }
 /* }}} */
 /* computePhase method {{{ */
@@ -790,7 +880,7 @@ void GPE2D::initialize(Expression *pot) {
         }
     }
     //Assign H diagonal and initial state
-    _H.diag(0).assign(v);
+    _H0.diag(0).assign(v);
     delete[] v;
     initializeFFT();
     _psi=cvm::cvector(psi,n);
@@ -805,18 +895,28 @@ void GPE2D::initializeFFT() {
     _planIFFT=fftw_plan_dft_3d(1,_ny,_nx,pspace,rspace,FFTW_BACKWARD,0);
 }
 /* }}} */
+/* ekin method {{{ */
+double GPE2D::ekin() {
+    double res=0.;
+    double n2=0.;
+    for(int j=0;j<_ny;j++) {
+        double k2y=(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
+        for(int i=0;i<_nx;i++) {
+            double k2x=(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
+            double psi2=std::norm(_psip[i+j*_nx]);
+            res+=2*_kterm*(k2x+k2y)*psi2;
+            n2+=psi2;
+        }
+    }
+    return res/n2;
+}
+/* }}} */
 /* }}} */
 /* class GPE2DROT implementation {{{ */
 /* Constructor {{{ */
 GPE2DROT::GPE2DROT(ConfigMap &config, Expression *H, Expression *pot) : GPE2D(config,H,pot) {
     _phase2=new std::complex<double>[_nx*_ny];
-    VarDef vars;
-    //Rotation term pre-factor
-    vars["LZ"]=&one;
-    vars["DELTA"]=&zero;
-    vars["VEXT"]=&zero;
-    vars["RHO"]=&zero;
-    _oterm=*((double*)(H->evaluate(vars)));
+    update(0);
 }
 /* }}} */
 /* initializeFFT method {{{ */
@@ -884,7 +984,7 @@ void GPE2DROT::doStep(std::complex<double> dt) {
     int n=_psi.size();
     std::complex<double> *v=_psi.get();
     for(int i=0;i<n;i++)
-        v[i]*=std::exp(dt*(_vpot[i]+_gN*std::norm(v[i])-_mu));
+        v[i]*=std::exp(dt*(_vpot[i]-_mu+_gN*std::norm(v[i])));
     fftw_execute(_planFFTxz);
     for(int i=0;i<n;i++)
         _psip[i]*=_phase[i];
@@ -893,6 +993,62 @@ void GPE2DROT::doStep(std::complex<double> dt) {
     for(int i=0;i<n;i++)
         _psip[i]*=_phase2[i];
     fftw_execute(_planIFFTyz);
+}
+/* }}} */
+/* update method {{{ */
+void GPE2DROT::update(double t) {
+    GPE::update(t);
+    VarDef vars;
+    vars["t_"]=new Constant(t);
+    //Rotation term pre-factor
+    vars["LZ"]=&one;
+    vars["DELTA"]=&zero;
+    vars["VEXT"]=&zero;
+    vars["RHO"]=&zero;
+    _oterm=*((double*)(_H->evaluate(vars)));
+}
+/* }}} */
+/* measure method {{{ */
+std::string GPE2DROT::measure() {
+    //Compute <Lz> & rotation energy
+    double lz1=0.;
+    double lz2=0.;
+    double xo=0.5*(_nx-1);
+    double yo=0.5*(_ny-1);
+    double n2=0.;
+    //Term ykx
+    fftw_execute(_planFFTxz);
+    for(int j=0;j<_ny;j++) {
+        double y=j-yo;
+        for(int i=0;i<_nx;i++) {
+            double kx=sin((2*pi*i)/_nx);
+            double psi2=std::norm(_psip[i+j*_nx]);
+            lz1-=y*kx*psi2;
+            n2+=psi2;
+        }
+    }
+    lz1/=n2;
+    fftw_execute(_planFFTy);
+    //Compute kinetic energy: term kxky
+    std::ostringstream mes;
+    mes << GPE::measure();
+    //Term xky
+    n2=0.;
+    fftw_execute(_planIFFTx);
+    for(int j=0;j<_ny;j++) {
+        double ky=sin((2*pi*j)/_ny);
+        for(int i=0;i<_nx;i++) {
+            double x=i-xo;
+            double psi2=std::norm(_psip[i+j*_nx]);
+            lz2+=x*ky*psi2;
+            n2+=psi2;
+        }
+    }
+    lz2/=n2;
+    double lz=lz1+lz2;
+    mes << ' ' << _oterm*lz << ' ' << lz;
+    std::string res=mes.str();
+    return res;
 }
 /* }}} */
 /* }}} */

@@ -37,7 +37,7 @@ void readPsi(const char *name, param &p) {
     file.read((char*)&p.dr,sizeof(double));
     file.read((char*)&p.mu,sizeof(double));
     if(type[0]!='P' || type[1]!='o' || type[2]!='l') {
-        cerr << "[E] Type: " << type << " not supported !" << endl;
+        cerr << "[E] Type: " << type[0] << type[1] << type[2] << " not supported!" << endl;
         return;
     }
     /* read data */
@@ -124,9 +124,11 @@ int main(int argc, char *argv[]) {
             printUsage(argv[0]);
             return -1;
     }
+    if(p.psi==0)
+        return 0;
     analyse(p);
     ofstream file("/tmp/psi2D.txt");
-    int nj=p.m*5;
+    int nj=abs(p.m)*20;
     if(nj<256) nj=256;
     if(p.u!=0 && p.v!=0) {
         for(int j=0;j<nj;j++) {
