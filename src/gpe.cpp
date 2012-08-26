@@ -181,7 +181,7 @@ void GPE::spectrum(string &name, int m) {
                 sumv2+=normv*normv/delta;
                 std::complex<double> *U=u.get();
                 std::complex<double> *V=v.get();
-                file.write((const char*)&(E[i]),sizeof(std::complex<double>));
+                file.write((const char*)&(E[i-1]),sizeof(std::complex<double>));
                 for(int j=0;j<n;j++)
                     file.write((const char*)&(U[j]),sizeof(std::complex<double>));
                 for(int j=0;j<n;j++)
@@ -698,8 +698,8 @@ void GPE1D::initialize(Expression *pot) {
     delete[] vl;
     fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
     fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
-    _planFFT=fftw_plan_dft_3d(1,1,_n,rspace,pspace,FFTW_FORWARD,0);
-    _planIFFT=fftw_plan_dft_3d(1,1,_n,pspace,rspace,FFTW_BACKWARD,0);
+    _planFFT=fftw_plan_dft_3d(1,1,_n,rspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
+    _planIFFT=fftw_plan_dft_3d(1,1,_n,pspace,rspace,FFTW_BACKWARD,FFTW_MEASURE);
     //Copy initial state into memory
     _psi=cvm::cvector(psi,_n);
     delete[] psi;
@@ -891,8 +891,8 @@ void GPE2D::initialize(Expression *pot) {
 void GPE2D::initializeFFT() {
     fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
     fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
-    _planFFT=fftw_plan_dft_3d(1,_ny,_nx,rspace,pspace,FFTW_FORWARD,0);
-    _planIFFT=fftw_plan_dft_3d(1,_ny,_nx,pspace,rspace,FFTW_BACKWARD,0);
+    _planFFT=fftw_plan_dft_3d(1,_ny,_nx,rspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
+    _planIFFT=fftw_plan_dft_3d(1,_ny,_nx,pspace,rspace,FFTW_BACKWARD,FFTW_MEASURE);
 }
 /* }}} */
 /* ekin method {{{ */
@@ -941,22 +941,22 @@ void GPE2DROT::initializeFFT() {
     dims[0]=dimz;
     dims[1]=dimx;
     hdims[0]=dimy;
-    _planFFTxz=fftw_plan_guru_dft(2,dims,1,hdims,rspace,pspace,FFTW_FORWARD,0);
+    _planFFTxz=fftw_plan_guru_dft(2,dims,1,hdims,rspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
     //Transform y
     dims[0]=dimy;
     hdims[0]=dimz;
     hdims[1]=dimx;
-    _planFFTy=fftw_plan_guru_dft(1,dims,2,hdims,pspace,pspace,FFTW_FORWARD,0);
+    _planFFTy=fftw_plan_guru_dft(1,dims,2,hdims,pspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
     //Inverse transform x
     dims[0]=dimx;
     hdims[0]=dimz;
     hdims[1]=dimy;
-    _planIFFTx=fftw_plan_guru_dft(1,dims,2,hdims,pspace,pspace,FFTW_BACKWARD,0);
+    _planIFFTx=fftw_plan_guru_dft(1,dims,2,hdims,pspace,pspace,FFTW_BACKWARD,FFTW_MEASURE);
     //Inverse transform y-z
     dims[0]=dimz;
     dims[1]=dimy;
     hdims[0]=dimx;
-    _planIFFTyz=fftw_plan_guru_dft(2,dims,1,hdims,pspace,rspace,FFTW_BACKWARD,0);
+    _planIFFTyz=fftw_plan_guru_dft(2,dims,1,hdims,pspace,rspace,FFTW_BACKWARD,FFTW_MEASURE);
 }
 /* }}} */
 /* computePhase method {{{ */
@@ -1046,7 +1046,7 @@ std::string GPE2DROT::measure() {
     }
     lz2/=n2;
     double lz=lz1+lz2;
-    mes << ' ' << _oterm*lz << ' ' << lz;
+    mes << ' ' << _oterm << ' ' << lz;
     std::string res=mes.str();
     return res;
 }
