@@ -57,30 +57,39 @@ class GPE {
         virtual state getHeader(std::ifstream &file) =0;
         /*!\brief Correct the hamiltonian for excited states. */
         virtual void correct(cvm::srmatrix &H, int m) {};
+        /*!\brief Computes one step of evolution. */
         virtual void doStep(std::complex<double> dt);
+        /*!\brief Computes the real time evolution of the system. */
         void evolve(double tstart, double dttest, double tend, std::string &name);
+        /*!\brief Memory allocation method. */
         void allocate(int n);
+        /*!\brief Compute the phases for Fourier methods. */
         virtual void computePhase(std::complex<double> dt) {};
+        /*!\brief Initialize the system. */
         virtual void initialize(Expression *pot) =0;
+        /*!\brief Evaluate the Hamiltonian. */
         virtual void update(double t);
+        /*!\brief Perform a measurement on the system. */
         virtual std::string measure();
+        /*!\brief Computes the potential energy. */
         virtual double epot();
+        /*!\brief Computes the kinetic energy. */
         virtual double ekin() { return 0; };
     protected:
-        cvm::srbmatrix _H0;  //!<Single body hamiltonian, stored as a tridiagonal real matrix.
+        cvm::srbmatrix _H0; //!<Single body hamiltonian, stored as a tridiagonal real matrix.
         cvm::cvector _psi;  //!<Groundstate wave function, stored as a complex vector.
         double _gN;         //!<Interaction term.
         double _kterm;      //!<Kinetic term prefactor.
         double _vterm;      //!<Potential term prefactor.
         double _mu;         //!<Chemical potential (or groundstate energy if no interactions).
-        std::complex<double> *_psip;
-        std::complex<double> *_phase;
-        double *_vpot;
+        std::complex<double> *_psip;    //!<Fourier space wave function representation.
+        std::complex<double> *_phase;   //!<Phase for Fourier transform methods.
+        double *_vpot;      //!<Real space potential array.
         fftw_plan _planFFT; //!<Resource for forward FFT.
         fftw_plan _planIFFT;//!<Resource for backward FFT.
-        Expression *_H;
+        Expression *_H;     //!<Symbolic representation of the Hamiltonian.
     private:
-        Expression *_pot;
+        Expression *_pot;   //!<Symbolic representation of the potential.
 };
 /* }}} */
 /* class Polar1D {{{ */
@@ -146,8 +155,12 @@ class GPE1D : public GPE {
 };
 /* }}} */
 /* class GPE2D {{{ */
+/*!\brief This class implements a Gross Pitaevskii equation in a two
+ * dimensional space.
+ */
 class GPE2D : public GPE {
     public:
+        /*!\brief Constructor. */
         GPE2D(ConfigMap &config, Expression *H,
                 Expression *pot);
         void spectrum(string &name, int m=0);
@@ -158,21 +171,26 @@ class GPE2D : public GPE {
         state getHeader(std::ifstream &file);
         void computePhase(std::complex<double> dt);
         void initialize(Expression *pot);
-        virtual void initializeFFT();
         double ekin();
+        /*!\brief Initialize resources for the FFT. */
+        virtual void initializeFFT();
     protected:
-        double _dx;
-        double _dy;
-        int _nx;
-        int _ny;
+        double _dx;     //!<Grid step size along X
+        double _dy;     //!<Grid step size along Y
+        int _nx;        //!<Number of grid points along X
+        int _ny;        //!<Number of grid points along Y
     private:
-        double _xmax;
-        double _ymax;
+        double _xmax;   //!<Maximum value of X on the grid
+        double _ymax;   //!<Maximum value of Y on the grid
 };
 /* }}} */
 /* class GPE2DROT {{{ */
+/*!\brief This class implements a Gross Pitaevskii equation in a two dimensional
+ * space whithin a rotating frame.
+ */
 class GPE2DROT : public GPE2D {
     public:
+        /*!\brief Constructor. */
         GPE2DROT(ConfigMap &config, Expression *H,
                 Expression *pot);
         void doStep(std::complex<double> dt);
@@ -181,7 +199,7 @@ class GPE2DROT : public GPE2D {
         void update(double dt);
         std::string measure();
     private:
-        double _oterm;          //!<Rotation term.
+        double _oterm;          //!<Rotation term (angular rotation frequency).
         fftw_plan _planFFTxz;   //!<Resource for forward FFT.
         fftw_plan _planFFTy;    //!<Resource for forward FFT.
         fftw_plan _planIFFTx;   //!<Resource for backward FFT.
