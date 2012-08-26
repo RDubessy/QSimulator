@@ -3,7 +3,31 @@
  * This program is designed to study the Non-Linear Schrodinger Equation (NLSE)
  * which is relevant, for instance, to describe Bose-Einstein Condensates.
  *
- * \todo Generalization to higher dimensions (cartesian or cylindrical/spherical).
+ * \section install Installation
+ * In the source directory of this software simply issue the commands:
+\verbatim
+$ make all
+$ sudo make install
+\endverbatim
+ * A working copy of the program should now be installed in the /opt/bin/
+ * directory.
+ * \section usage Usage
+ * In this section we assume that the program is build and installed according
+ * to the procedure described in Section \ref install.
+ *
+ * \subsection cmdline Command line invocation
+ * \subsubsection config Configuration file
+ * \subsubsection actions Actions
+ * \subsubsection options Options
+ * \subsection example Examples
+ * \subsubsection groundstate Computing the ground state
+ * \verbatim $ qsimu example.cfg --groundstate --log=log.txt --out=psi0.dat\endverbatim
+ * \subsubsection spectrum Computing the spectrum
+ * \verbatim $ qsimu example.cfg --log=log.txt --in=psi0.dat --spectrum\endverbatim
+ * \subsubsection dynamics Time dependent dynamics
+ * \verbatim $ qsimu example.cfg --log=log.txt --in=psi0.dat --out=psi1.dat --evolve=0:0.1:1\endverbatim
+ */
+/*!\todo Generalization to higher dimensions (cartesian or cylindrical/spherical).
  */
 #include <iostream>     //For cerr/cout/endl...
 #include <fstream>      //For ofstream/ifstream...
@@ -45,7 +69,7 @@ int mainFunction(ConfigMap &config) {
             gpe=new GPE2D(config,eqn,pot);
     }
     if(gpe==0) {
-        std::cerr << "[E] Unknown problem type!" << std::endl;
+        cerr << "[E] Unknown problem type!" << std::endl;
         return -1;
     }
     gpe->initialize(pot);
@@ -84,6 +108,9 @@ int mainFunction(ConfigMap &config) {
         range<double> def={0.,1.,1e-3};
         range<double> t=getConfig(config,string("evolve"),def);
         gpe->evolve(t.min,t.incr,t.max,out);
+    }
+    if(config.find("measure")!=config.end()) {
+        std::cout << gpe->measure() << std::endl;
     }
     return 0;
 };

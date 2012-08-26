@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS += -pg
+#CFLAGS += -pg
 CFLAGS += -O3 -ffast-math
 CFLAGS += -march=native
 CFLAGS += -Wall
