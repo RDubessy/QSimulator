@@ -157,6 +157,9 @@ class GPE1D : public GPE {
 /* class GPE2D {{{ */
 /*!\brief This class implements a Gross Pitaevskii equation in a two
  * dimensional space.
+ *
+ * In this case the laplacian is:
+ * \f[\Delta=\frac{\partial^2}{\partial x^2}+\frac{\partial^2}{\partial y^2}.\f]
  */
 class GPE2D : public GPE {
     public:
@@ -187,6 +190,9 @@ class GPE2D : public GPE {
 /* class GPE2DROT {{{ */
 /*!\brief This class implements a Gross Pitaevskii equation in a two dimensional
  * space whithin a rotating frame.
+ *
+ * In this case the laplacian is:
+ * \f[\Delta=\frac{\partial^2}{\partial x^2}+\frac{\partial^2}{\partial y^2}.\f]
  */
 class GPE2DROT : public GPE2D {
     public:
