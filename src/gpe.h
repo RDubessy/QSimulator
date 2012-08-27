@@ -207,5 +207,38 @@ class GPE2DROT : public GPE2D {
         std::complex<double> *_phase2;//!<Correction to the kinetic energy contribution.
 };
 /* }}} */
+/* class GPE3D {{{ */
+/*!\brief This class implements a Gross Pitaevskii equation in a two
+ * dimensional space.
+ */
+class GPE3D : public GPE {
+    public:
+        /*!\brief Constructor. */
+        GPE3D(ConfigMap &config, Expression *H,
+                Expression *pot);
+        void spectrum(string &name, int m=0);
+        double norm(cvm::rvector &psi) const;
+        double norm(cvm::cvector &psi) const;
+        void plot(int nmode, std::string &name);
+        void setHeader(std::ofstream &file) const;
+        state getHeader(std::ifstream &file);
+        void computePhase(std::complex<double> dt);
+        void initialize(Expression *pot);
+        double ekin();
+        /*!\brief Initialize resources for the FFT. */
+        virtual void initializeFFT();
+    protected:
+        double _dx;     //!<Grid step size along X
+        double _dy;     //!<Grid step size along Y
+        double _dz;     //!<Grid step size along Z
+        int _nx;        //!<Number of grid points along X
+        int _ny;        //!<Number of grid points along Y
+        int _nz;        //!<Number of grid points along Z
+    private:
+        double _xmax;   //!<Maximum value of X on the grid
+        double _ymax;   //!<Maximum value of Y on the grid
+        double _zmax;   //!<Maximum value of Z on the grid
+};
+/* }}} */
 #endif //GPE_H
 /* gpe.h */

@@ -741,7 +741,6 @@ double GPE2D::norm(cvm::cvector &psi) const {
 /* plot method {{{ */
 void GPE2D::plot(int nmode, std::string &name) {
     std::ofstream file("/tmp/psi.txt");
-    std::ifstream spectrum(name.c_str());
     if(file.is_open()) {
         const std::complex<double> *psi=_psi.get();
         for(int j=0;j<_ny;j++) {
@@ -1049,6 +1048,216 @@ std::string GPE2DROT::measure() {
     mes << ' ' << _oterm << ' ' << lz;
     std::string res=mes.str();
     return res;
+}
+/* }}} */
+/* }}} */
+/* class GPE3D implementation {{{ */
+/* Constructor {{{ */
+GPE3D::GPE3D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H,pot) {
+    std::cerr << "[I] Initializing a 3D Cartesian system" << std::endl;
+    _nx=getConfig(config,string("x3D::nx"),64);
+    _ny=getConfig(config,string("x3D::ny"),_nx);
+    _nz=getConfig(config,string("x3D::nz"),_ny);
+    _xmax=getConfig(config,string("x3D::Lx"),1.);
+    _ymax=getConfig(config,string("x3D::Ly"),_xmax);
+    _zmax=getConfig(config,string("x3D::Lz"),_zmax);
+    _dx=_xmax/(_nx-1);
+    _dy=_ymax/(_ny-1);
+    _dz=_zmax/(_nz-1);
+    _xmax/=2;
+    _ymax/=2;
+    _zmax/=2;
+    int n=_nx*_ny*_nz;
+    _psi.resize(n);
+    _H0.resize(n);
+    allocate(n);
+}
+/* }}} */
+/* spectrum method {{{ */
+void GPE3D::spectrum(string &name, int m) {
+    std::cerr << "[E] spectrum method NOT implemented for a 3D system !" << std::endl;
+    return;
+}
+/* }}} */
+/* norm methods {{{ */
+double GPE3D::norm(cvm::rvector &psi) const {
+    return sqrt(_dx*_dy*_dz)*psi.norm2();
+}
+double GPE3D::norm(cvm::cvector &psi) const {
+    return sqrt(_dx*_dy*_dz)*psi.norm2();
+}
+/* }}} */
+/* plot method {{{ */
+void GPE3D::plot(int nmode, std::string &name) {
+    std::ofstream file;
+    file.open("/tmp/psiXY.txt");
+    if(file.is_open()) {
+        const std::complex<double> *psi=_psi.get();
+        for(int j=0;j<_ny;j++) {
+            for(int i=0;i<_nx;i++) {
+                double psi2=0;
+                for(int k=0;k<_nz;k++)
+                    psi2+=std::norm(psi[i+(j+k*_ny)*_nx]);
+                psi2/=2*_zmax;
+                file << i*_dx-_xmax << ' ' << j*_dy-_ymax << ' ' << psi2
+                    << '\n';
+            }
+            file << '\n';
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file \"/tmp/psiXY.txt\" !" << std::endl;
+    }
+    file.open("/tmp/psiXZ.txt");
+    if(file.is_open()) {
+        const std::complex<double> *psi=_psi.get();
+        for(int k=0;k<_nz;k++) {
+            for(int i=0;i<_nx;i++) {
+                double psi2=0;
+                for(int j=0;j<_ny;j++)
+                    psi2+=std::norm(psi[i+(j+k*_ny)*_nx]);
+                psi2/=2*_ymax;
+                file << k*_dz-_zmax << ' ' << i*_dx-_xmax << ' ' << psi2
+                    << '\n';
+            }
+            file << '\n';
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file \"/tmp/psiXZ.txt\" !" << std::endl;
+    }
+    std::cout << "set view map;unset surface;set pm3d;unset key;"
+        << "set size square;set size 1,1;set origin 0,0;"
+        << "set multiplot layout 1,2;"
+        << "splot \"/tmp/psiXY.txt\" using 1:2:3;"
+        << "splot \"/tmp/psiXZ.txt\" using 1:2:3;"
+        << "unset multiplot;"
+        << "pause mouse\n";
+    std::cout.flush();
+    return;
+}
+/* }}} */
+/* setHeader method {{{ */
+void GPE3D::setHeader(std::ofstream &file) const {
+    const char *type="x3D";
+    file.write((const char*)type,3*sizeof(char));
+    file.write((const char*)&_nx,sizeof(int));
+    file.write((const char*)&_ny,sizeof(int));
+    file.write((const char*)&_nz,sizeof(int));
+    file.write((const char*)&_xmax,sizeof(double));
+    file.write((const char*)&_ymax,sizeof(double));
+    file.write((const char*)&_zmax,sizeof(double));
+    file.write((const char*)&_dx,sizeof(double));
+    file.write((const char*)&_dy,sizeof(double));
+    file.write((const char*)&_dz,sizeof(double));
+    file.write((const char*)&_mu,sizeof(double));
+}
+/* }}} */
+/* getHeader method {{{ */
+state GPE3D::getHeader(std::ifstream &file) {
+    char type[3];
+    file.read((char*)type,3*sizeof(char));
+    if(type[0]=='x' && type[1]=='3' && type[2]=='D') {
+        double mu,dx,xmax,dy,ymax,dz,zmax;
+        int nx,ny,nz;
+        file.read((char*)&nx,sizeof(int));
+        file.read((char*)&ny,sizeof(int));
+        file.read((char*)&nz,sizeof(int));
+        file.read((char*)&xmax,sizeof(double));
+        file.read((char*)&ymax,sizeof(double));
+        file.read((char*)&zmax,sizeof(double));
+        file.read((char*)&dx,sizeof(double));
+        file.read((char*)&dy,sizeof(double));
+        file.read((char*)&dz,sizeof(double));
+        file.read((char*)&mu,sizeof(double));
+        _mu=mu;
+        if(nx!=_nx || ny!=_ny || nz!=_nz) {
+            std::cerr << "[E] Incompatible size !" << std::endl;
+            return error;
+        }
+    } else {
+        std::cerr << "[E] Incompatible type !" << std::endl;
+        return error;
+    }
+    return ok;
+}
+/* }}} */
+/* computePhase method {{{ */
+void GPE3D::computePhase(std::complex<double> dt) {
+    double scale=1./(_nx*_ny*_nz);
+    for(int k=0;k<_nz;k++) {
+        double k2z=(cos((2*pi*k)/_nz)-1)/(_dz*_dz);
+        for(int j=0;j<_ny;j++) {
+            double k2y=(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
+            for(int i=0;i<_nx;i++) {
+                double k2x=(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
+                double k2=2*(k2x+k2y+k2z);
+                _phase[i+(j+k*_ny)*_nx]=scale*exp(dt*_kterm*k2);
+            }
+        }
+    }
+}
+/* }}} */
+/* initialize method {{{ */
+void GPE3D::initialize(Expression *pot) {
+    //Only a diagonal part
+    VarDef vars;
+    vars["X"]=new Constant(0);
+    vars["Y"]=new Constant(0);
+    vars["Z"]=new Constant(0);
+    int n=_nx*_ny*_nz;
+    double *v=new double[n];
+    double *psi=new double[n];
+    for(int k=0;k<_nz;k++) {
+        double z=k*_dz-_zmax;
+        vars["Z"]->set(&z);
+        for(int j=0;j<_ny;j++) {
+            double y=j*_dy-_ymax;
+            vars["Y"]->set(&y);
+            for(int i=0;i<_nx;i++) {
+                double x=i*_dx-_xmax;
+                vars["X"]->set(&x);
+                double vpot=*((double*)(pot->evaluate(vars)));
+                vpot*=_vterm;
+                _vpot[i+(j+k*_ny)*_nx]=vpot;
+                v[i+(j+k*_ny)*_nx]=vpot;
+                psi[i+(j+k*_ny)*_nx]=vpot<1?sqrt(1-vpot):0;
+            }
+        }
+    }
+    //Assign H diagonal and initial state
+    _H0.diag(0).assign(v);
+    delete[] v;
+    initializeFFT();
+    _psi=cvm::cvector(psi,n);
+    delete[] psi;
+}
+/* }}} */
+/* initializeFFT method {{{ */
+void GPE3D::initializeFFT() {
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
+    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
+    _planFFT=fftw_plan_dft_3d(_nz,_ny,_nx,rspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
+    _planIFFT=fftw_plan_dft_3d(_nz,_ny,_nx,pspace,rspace,FFTW_BACKWARD,FFTW_MEASURE);
+}
+/* }}} */
+/* ekin method {{{ */
+double GPE3D::ekin() {
+    double res=0.;
+    double n2=0.;
+    for(int k=0;k<_nz;k++) {
+        double k2z=(cos((2*pi*k)/_nz)-1)/(_dz*_dz);
+        for(int j=0;j<_ny;j++) {
+            double k2y=(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
+            for(int i=0;i<_nx;i++) {
+                double k2x=(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
+                double psi2=std::norm(_psip[i+(j+k*_ny)*_nx]);
+                res+=2*_kterm*(k2x+k2y+k2z)*psi2;
+                n2+=psi2;
+            }
+        }
+    }
+    return res/n2;
 }
 /* }}} */
 /* }}} */
