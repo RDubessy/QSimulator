@@ -208,7 +208,7 @@ class GPE2DROT : public GPE2D {
 };
 /* }}} */
 /* class GPE3D {{{ */
-/*!\brief This class implements a Gross Pitaevskii equation in a two
+/*!\brief This class implements a Gross Pitaevskii equation in a three
  * dimensional space.
  */
 class GPE3D : public GPE {
@@ -238,6 +238,29 @@ class GPE3D : public GPE {
         double _xmax;   //!<Maximum value of X on the grid
         double _ymax;   //!<Maximum value of Y on the grid
         double _zmax;   //!<Maximum value of Z on the grid
+};
+/* }}} */
+/* class GPE3DROT {{{ */
+/*!\brief This class implements a Gross Pitaevskii equation in a three 
+ * dimensional space whithin a rotating frame.
+ */
+class GPE3DROT : public GPE3D {
+    public:
+        /*!\brief Constructor. */
+        GPE3DROT(ConfigMap &config, Expression *H,
+                Expression *pot);
+        void doStep(std::complex<double> dt);
+        void computePhase(std::complex<double> dt);
+        void initializeFFT();
+        void update(double dt);
+        std::string measure();
+    private:
+        double _oterm;          //!<Rotation term (angular rotation frequency).
+        fftw_plan _planFFTxz;   //!<Resource for forward FFT.
+        fftw_plan _planFFTy;    //!<Resource for forward FFT.
+        fftw_plan _planIFFTx;   //!<Resource for backward FFT.
+        fftw_plan _planIFFTyz;  //!<Resource for backward FFT.
+        std::complex<double> *_phase2;//!<Correction to the kinetic energy contribution.
 };
 /* }}} */
 #endif //GPE_H

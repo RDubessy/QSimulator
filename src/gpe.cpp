@@ -1261,4 +1261,151 @@ double GPE3D::ekin() {
 }
 /* }}} */
 /* }}} */
+/* class GPE3DROT implementation {{{ */
+/* Constructor {{{ */
+GPE3DROT::GPE3DROT(ConfigMap &config, Expression *H, Expression *pot) : GPE3D(config,H,pot) {
+    _phase2=new std::complex<double>[_nx*_ny*_nz];
+    update(0);
+}
+/* }}} */
+/* initializeFFT method {{{ */
+void GPE3DROT::initializeFFT() {
+    std::cerr << "[I] FFT in Rotating Frame" << std::endl;
+    //Initialize the plans for fast fourier transform
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
+    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
+    fftw_iodim dimx,dimy,dimz;
+    dimz.n=_nz;
+    dimz.is=_nx*_ny;
+    dimz.os=_nx*_ny;
+    dimy.n=_ny;
+    dimy.is=_nx;
+    dimy.os=_nx;
+    dimx.n=_nx;
+    dimx.is=1;
+    dimx.os=1;
+    fftw_iodim dims[2];
+    fftw_iodim hdims[2];
+    //Transform x-z
+    dims[0]=dimz;
+    dims[1]=dimx;
+    hdims[0]=dimy;
+    _planFFTxz=fftw_plan_guru_dft(2,dims,1,hdims,rspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
+    //Transform y
+    dims[0]=dimy;
+    hdims[0]=dimz;
+    hdims[1]=dimx;
+    _planFFTy=fftw_plan_guru_dft(1,dims,2,hdims,pspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
+    //Inverse transform x
+    dims[0]=dimx;
+    hdims[0]=dimz;
+    hdims[1]=dimy;
+    _planIFFTx=fftw_plan_guru_dft(1,dims,2,hdims,pspace,pspace,FFTW_BACKWARD,FFTW_MEASURE);
+    //Inverse transform y-z
+    dims[0]=dimz;
+    dims[1]=dimy;
+    hdims[0]=dimx;
+    _planIFFTyz=fftw_plan_guru_dft(2,dims,1,hdims,pspace,rspace,FFTW_BACKWARD,FFTW_MEASURE);
+}
+/* }}} */
+/* computePhase method {{{ */
+void GPE3DROT::computePhase(std::complex<double> dt) {
+    double scale=1./(_nx*_ny*_nz);
+    double xo=0.5*(_nx-1);
+    double yo=0.5*(_ny-1);
+    for(int k=0;k<_nz;k++) {
+        double k2z=2*(cos((2*pi*k)/_nz)-1)/(_dz*_dz);
+        for(int j=0;j<_ny;j++) {
+            double y=j-yo;
+            double k2y=2*(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
+            double ky=sin((2*pi*j)/_ny);
+            for(int i=0;i<_nx;i++) {
+                double x=i-xo;
+                double k2x=2*(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
+                double kx=sin((2*pi*i)/_nx);
+                _phase[i+(j+k*_ny)*_nx]=scale*exp(dt*(_kterm*(k2x+k2z)-_oterm*y*kx));
+                _phase2[i+(j+k*_ny)*_nx]=exp(dt*(_kterm*k2y+_oterm*x*ky));
+            }
+        }
+    }
+    return;
+}
+/* }}} */
+/* doStep method {{{ */
+void GPE3DROT::doStep(std::complex<double> dt) {
+    int n=_psi.size();
+    std::complex<double> *v=_psi.get();
+    for(int i=0;i<n;i++)
+        v[i]*=std::exp(dt*(_vpot[i]-_mu+_gN*std::norm(v[i])));
+    fftw_execute(_planFFTxz);
+    for(int i=0;i<n;i++)
+        _psip[i]*=_phase[i];
+    fftw_execute(_planFFTy);
+    fftw_execute(_planIFFTx);
+    for(int i=0;i<n;i++)
+        _psip[i]*=_phase2[i];
+    fftw_execute(_planIFFTyz);
+}
+/* }}} */
+/* update method {{{ */
+void GPE3DROT::update(double t) {
+    GPE::update(t);
+    VarDef vars;
+    vars["t_"]=new Constant(t);
+    //Rotation term pre-factor
+    vars["LZ"]=&one;
+    vars["DELTA"]=&zero;
+    vars["VEXT"]=&zero;
+    vars["RHO"]=&zero;
+    _oterm=*((double*)(_H->evaluate(vars)));
+}
+/* }}} */
+/* measure method {{{ */
+std::string GPE3DROT::measure() {
+    //Compute <Lz> & rotation energy
+    double lz1=0.;
+    double lz2=0.;
+    double xo=0.5*(_nx-1);
+    double yo=0.5*(_ny-1);
+    double n2=0.;
+    //Term ykx
+    fftw_execute(_planFFTxz);
+    for(int k=0;k<_nz;k++) {
+        for(int j=0;j<_ny;j++) {
+            double y=j-yo;
+            for(int i=0;i<_nx;i++) {
+                double kx=sin((2*pi*i)/_nx);
+                double psi2=std::norm(_psip[i+(j+k*_ny)*_nx]);
+                lz1-=y*kx*psi2;
+                n2+=psi2;
+            }
+        }
+    }
+    lz1/=n2;
+    fftw_execute(_planFFTy);
+    //Compute kinetic energy: term kxky
+    std::ostringstream mes;
+    mes << GPE::measure();
+    //Term xky
+    n2=0.;
+    fftw_execute(_planIFFTx);
+    for(int k=0;k<_nz;k++) {
+        for(int j=0;j<_ny;j++) {
+            double ky=sin((2*pi*j)/_ny);
+            for(int i=0;i<_nx;i++) {
+                double x=i-xo;
+                double psi2=std::norm(_psip[i+(j+k*_ny)*_nx]);
+                lz2+=x*ky*psi2;
+                n2+=psi2;
+            }
+        }
+    }
+    lz2/=n2;
+    double lz=lz1+lz2;
+    mes << ' ' << _oterm << ' ' << lz;
+    std::string res=mes.str();
+    return res;
+}
+/* }}} */
+/* }}} */
 /* gpe.cpp */
