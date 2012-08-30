@@ -67,6 +67,11 @@ int mainFunction(ConfigMap &config) {
             gpe=new GPE2DROT(config,eqn,pot);
         else
             gpe=new GPE2D(config,eqn,pot);
+    } else if(config["general::type"]=="Cartesian3D") {
+        if(config["general::equation"].find("LZ")!=string::npos)
+            gpe=new GPE3DROT(config,eqn,pot);
+        else
+            gpe=new GPE3D(config,eqn,pot);
     }
     if(gpe==0) {
         cerr << "[E] Unknown problem type!" << std::endl;
