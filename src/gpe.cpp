@@ -367,11 +367,11 @@ double GPE::epot() {
 Polar1D::Polar1D(ConfigMap &config, Expression *H,
         Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 1D Polar system" << std::endl;
-    _n=getConfig(config,string("polar::n"),64);
-    _rmin=getConfig(config,string("polar::rmin"),0.01);
-    _rmax=getConfig(config,string("polar::rmax"),1.0);
+    _n=getConfig(config,string("grid::nr"),64);
+    _rmin=getConfig(config,string("grid::rmin"),0.01);
+    _rmax=getConfig(config,string("grid::rmax"),1.0);
     _dr=(_rmax-_rmin)/(_n-1);
-    _l=getConfig(config,string("polar::l"),0);
+    _l=getConfig(config,string("grid::l"),0);
     _psi.resize(_n);
     _H0.resize(_n);
     _H0.resize_lu(1,1);
@@ -562,8 +562,8 @@ void Polar1D::initialize(Expression *pot) {
 GPE1D::GPE1D(ConfigMap &config, Expression *H,
         Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 1D Cartesian system" << std::endl;
-    _n=getConfig(config,string("x1D::n"),64);
-    _xmax=getConfig(config,string("x1D::L"),0.01);
+    _n=getConfig(config,string("grid::nx"),64);
+    _xmax=getConfig(config,string("grid::Lx"),0.01);
     _dx=_xmax/(_n-1);
     _xmax/=2;
     _psi.resize(_n);
@@ -710,10 +710,10 @@ void GPE1D::initialize(Expression *pot) {
 /* Constructor {{{ */
 GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 2D Cartesian system" << std::endl;
-    _nx=getConfig(config,string("x2D::nx"),64);
-    _ny=getConfig(config,string("x2D::ny"),_nx);
-    _xmax=getConfig(config,string("x2D::Lx"),1.);
-    _ymax=getConfig(config,string("x2D::Ly"),_xmax);
+    _nx=getConfig(config,string("grid::nx"),64);
+    _ny=getConfig(config,string("grid::ny"),_nx);
+    _xmax=getConfig(config,string("grid::Lx"),1.);
+    _ymax=getConfig(config,string("grid::Ly"),_xmax);
     _dx=_xmax/(_nx-1);
     _dy=_ymax/(_ny-1);
     _xmax/=2;
@@ -1055,12 +1055,12 @@ std::string GPE2DROT::measure() {
 /* Constructor {{{ */
 GPE3D::GPE3D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 3D Cartesian system" << std::endl;
-    _nx=getConfig(config,string("x3D::nx"),64);
-    _ny=getConfig(config,string("x3D::ny"),_nx);
-    _nz=getConfig(config,string("x3D::nz"),_ny);
-    _xmax=getConfig(config,string("x3D::Lx"),1.);
-    _ymax=getConfig(config,string("x3D::Ly"),_xmax);
-    _zmax=getConfig(config,string("x3D::Lz"),_zmax);
+    _nx=getConfig(config,string("grid::nx"),64);
+    _ny=getConfig(config,string("grid::ny"),_nx);
+    _nz=getConfig(config,string("grid::nz"),_ny);
+    _xmax=getConfig(config,string("grid::Lx"),1.);
+    _ymax=getConfig(config,string("grid::Ly"),_xmax);
+    _zmax=getConfig(config,string("grid::Lz"),_zmax);
     _dx=_xmax/(_nx-1);
     _dy=_ymax/(_ny-1);
     _dz=_zmax/(_nz-1);
