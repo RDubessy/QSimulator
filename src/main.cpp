@@ -1,32 +1,3 @@
-/*!\mainpage Quantum simulation software.
- *
- * This program is designed to study the Non-Linear Schrodinger Equation (NLSE)
- * which is relevant, for instance, to describe Bose-Einstein Condensates.
- *
- * \section install Installation
- * In the source directory of this software simply issue the commands:
-\verbatim
-$ make all
-$ sudo make install
-\endverbatim
- * A working copy of the program should now be installed in the /opt/bin/
- * directory.
- * \section usage Usage
- * In this section we assume that the program is build and installed according
- * to the procedure described in Section \ref install.
- *
- * \subsection cmdline Command line invocation
- * \subsubsection config Configuration file
- * \subsubsection actions Actions
- * \subsubsection options Options
- * \subsection example Examples
- * \subsubsection groundstate Computing the ground state
- * \verbatim $ qsimu example.cfg --groundstate --log=log.txt --out=psi0.dat\endverbatim
- * \subsubsection spectrum Computing the spectrum
- * \verbatim $ qsimu example.cfg --log=log.txt --in=psi0.dat --spectrum\endverbatim
- * \subsubsection dynamics Time dependent dynamics
- * \verbatim $ qsimu example.cfg --log=log.txt --in=psi0.dat --out=psi1.dat --evolve=0:0.1:1\endverbatim
- */
 /*!\todo Generalization to higher dimensions (cartesian or cylindrical/spherical).
  */
 #include <iostream>     //For cerr/cout/endl...
@@ -58,21 +29,23 @@ int mainFunction(ConfigMap &config) {
     eqn=eqn->simplify(params);
     pot=pot->simplify(params);
     GPE *gpe=0;
-    if(config["general::type"]=="Polar") {
+    if(pot->find("X")) {
+        if(pot->find("Y")) {
+            if(pot->find("Z")) {
+                if(eqn->find("LZ"))
+                    gpe=new GPE3DROT(config,eqn,pot);
+                else
+                    gpe=new GPE3D(config,eqn,pot);
+            } else {
+                if(eqn->find("LZ"))
+                    gpe=new GPE2DROT(config,eqn,pot);
+                else
+                    gpe=new GPE2D(config,eqn,pot);
+            }
+        } else
+            gpe=new GPE1D(config,eqn,pot);
+    } else if(eqn->find("R"))
         gpe=new Polar1D(config,eqn,pot);
-    } else if(config["general::type"]=="Cartesian1D") {
-        gpe=new GPE1D(config,eqn,pot);
-    } else if(config["general::type"]=="Cartesian2D") {
-        if(config["general::equation"].find("LZ")!=string::npos)
-            gpe=new GPE2DROT(config,eqn,pot);
-        else
-            gpe=new GPE2D(config,eqn,pot);
-    } else if(config["general::type"]=="Cartesian3D") {
-        if(config["general::equation"].find("LZ")!=string::npos)
-            gpe=new GPE3DROT(config,eqn,pot);
-        else
-            gpe=new GPE3D(config,eqn,pot);
-    }
     if(gpe==0) {
         cerr << "[E] Unknown problem type!" << std::endl;
         return -1;
@@ -122,11 +95,33 @@ int mainFunction(ConfigMap &config) {
 /* }}} */
 /* usage method {{{ */
 void usage(const char *name) {
-    cerr << "Usage: " << name << " CONFIG_FILE [OPTIONS]\n"
+    cerr << "Usage: " << name << " CONFIG_FILE [OPTIONS] [ACTIONS]\n"
         << "The << qsimu >> program is intended to study properties of the Non-Linear\n"
         << "Schrodinger Equation (NLSE) also known in the cold atom community as the\n"
         << "Gross-Pitaevskii Equation (GPE). As of now it can compute the groundstate\n"
-        << "of the equation and the spectrum of linear excitations."
+        << "of the equation, its time dynamics evolution and the spectrum of linear\n"
+        << "(Bogoliubov) excitations.\n"
+        << endl;
+    cerr << "Possible [OPTIONS] are:\n"
+        << "  --usage,--help    Display this screen and exits.\n"
+        << "  --in=FILE         Load the initial state from file FILE.\n"
+        << "  --out=FILE        Save the final state to file FILE.\n"
+        << "  --log[=FILE]      Store the logs in the file log.txt or in the provided\n"
+        << "                    (optionnal) FILE.\n"
+        << "  --FIELD::KEYWORD=VALUE\n"
+        << "                    Special option format which allows you to modify options\n"
+        << "                    passed in CONFIG_FILE, namely assign a new VALUE to\n"
+        << "                    KEYWORD in part FIELD of the file. See the documentation\n"
+        << "                    for more details.\n"
+        << endl;
+    cerr << "Possible [ACTIONS] are:\n"
+        << "  --groundstate     Computes the groundstate of the system and store the\n"
+        << "                    result accordingly to --out=FILE. Use --log to get info\n"
+        << "                    on the convergence towards the final state.\n"
+        << "  --spectrum=RANGE\n"
+        << "  --evolve=RANGE\n"
+        << "  --plot\n"
+        << "  --measure\n"
         << endl;
 };
 /* }}} */

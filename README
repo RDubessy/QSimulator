@@ -1,0 +1,86 @@
+/*!\mainpage Quantum simulation software.
+This program is designed to study the Non-Linear Schrodinger Equation (NLSE) 
+which is relevant, for instance, to describe Bose-Einstein Condensates.
+
+\section install Installation
+In the source directory of this software simply issue the commands:
+\verbatim
+$ make all
+$ sudo make install
+\endverbatim
+A working copy of the program should now be installed in the /opt/bin/
+directory.
+
+\section usage Usage
+In this section we assume that the program is build and installed according
+to the procedure described in Section \ref install.
+
+\subsection cmdline Command line invocation
+To invoke the program you will need to issue a command of the form:
+\verbatim
+$ qsimu CONFIG_FILE [OPTIONS] [ACTIONS]
+\endverbatim
+where:
+- \verbatim CONFIG_FILE\endverbatim is a configuration file,
+- \verbatim[OPTIONS]\endverbatim is a list of options,
+- \verbatim[ACTIONS]\endverbatim is a list of actions.
+
+Please note that only the configuration file is necessary to run the program
+otherwise you will get an error, but it will perform something usefull only if
+you select an action.
+These three elements are described more completely hereafter.
+
+\subsubsection config Configuration file
+The configuration file provides the necessary informations to initialize the 
+program using a specific syntax. This file is cut into fields, labelled by a 
+keyword between square brackets, which consists in a list of assignment.
+You may want to have a look at an \ref examplefile.
+
+The assignments are of the form: keyword=value, where value is either a string,
+a constant or a mathematical expression.
+
+The allowed fields are:
+- [general] with the assignments:
+    - equation=mathematical expression,
+    - potential=mathematical expression,
+    - type=string,
+    - dt=constant,
+    - tol=constant,
+    - dttol=constant,
+- [problem] where [problem] is one of these:
+    - [x1D] sets up a GPE1D problem,
+    - [x2D] sets up a GPE2D problem,
+    - [x3D] sets up a GPE3D problem,
+    - [polar] sets up a Polar1D problem,
+- [parameters] (optional) contains all the user defined literal constants used
+in the "equation" or "potential" assignments.
+
+\subsubsection actions Actions
+The actions are passed to the program as
+\subsubsection options Options
+\subsection example Examples
+\subsubsection examplefile Example configuration file
+The following configuration file will set up a GPE1D problem on a 256 points grid
+with harmonic trapping potential and interactions.
+\verbatim
+[general]
+equation=(-1/2)*DELTA+VEXT+g*RHO
+potential=1/2*X^2
+type=Cartesian1D
+dt=1e-3
+tol=1e-12
+dttol=0.9
+[parameters]
+g=8000
+[x1D]
+n=256
+L=16
+\endverbatim
+
+\subsubsection groundstate Computing the ground state
+\verbatim $ qsimu example.cfg --groundstate --log=log.txt --out=psi0.dat\endverbatim
+\subsubsection spectrum Computing the spectrum
+\verbatim $ qsimu example.cfg --log=log.txt --in=psi0.dat --spectrum\endverbatim
+\subsubsection dynamics Time dependent dynamics
+\verbatim $ qsimu example.cfg --log=log.txt --in=psi0.dat --out=psi1.dat --evolve=0:0.1:1\endverbatim
+*/
