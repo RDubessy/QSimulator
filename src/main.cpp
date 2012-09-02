@@ -1,4 +1,4 @@
-/*!\todo Generalization to higher dimensions (cartesian or cylindrical/spherical).
+/*!\todo Generalization to cylindrical coordinates.
  */
 #include <iostream>     //For cerr/cout/endl...
 #include <fstream>      //For ofstream/ifstream...
@@ -72,10 +72,6 @@ int mainFunction(ConfigMap &config) {
         gpe->findGroundState(dt,tol,dttol,log);
         gpe->save(out);
     }
-    if(config.find("plot")!=config.end()) {
-        int n=5; //getConfig(config,string("plot"),0);
-        gpe->plot(n,config["plot"]);
-    }
     if(config.find("spectrum")!=config.end()) {
         range<int> def={0,0,1};
         range<int> m=getConfig(config,string("spectrum"),def);
@@ -86,6 +82,10 @@ int mainFunction(ConfigMap &config) {
         range<double> def={0.,1.,1e-3};
         range<double> t=getConfig(config,string("evolve"),def);
         gpe->evolve(t.min,t.incr,t.max,out);
+    }
+    if(config.find("plot")!=config.end()) {
+        int n=5; //getConfig(config,string("plot"),0);
+        gpe->plot(n,config["plot"]);
     }
     if(config.find("measure")!=config.end()) {
         std::cout << gpe->measure() << std::endl;
