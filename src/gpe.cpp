@@ -910,6 +910,21 @@ double GPE2D::ekin() {
     return res/n2;
 }
 /* }}} */
+/* imprint method {{{ */
+void GPE2D::imprint(int l) {
+    double xo=0.5*(_nx-1);
+    double yo=0.5*(_ny-1);
+    std::complex<double> *psi=_psi.get();
+    for(int j=0;j<_ny;j++) {
+        double y=j-yo;
+        for(int i=0;i<_nx;i++) {
+            double x=i-xo;
+            double phase=-atan2(y,-x)+2*pi;
+            psi[i+j*_nx]*=exp(std::complex<double>(0,l*phase));
+        }
+    }
+}
+/* }}} */
 /* }}} */
 /* class GPE2DROT implementation {{{ */
 /* Constructor {{{ */

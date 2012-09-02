@@ -65,6 +65,11 @@ int mainFunction(ConfigMap &config) {
             log=config["log"];
         }
     }
+    if(config.find("imprint")!=config.end()) {
+        int l=getConfig(config,string("imprint"),1);
+        std::cerr << "[I] Imprinting a l=" << l << " circulation" << endl;
+        gpe->imprint(l);
+    }
     if(config.find("groundstate")!=config.end()) {
         double dt=getConfig(config,string("general::dt"),1e-3);
         double tol=getConfig(config,string("general::tol"),1e-8);

@@ -75,6 +75,8 @@ class GPE {
         virtual double epot();
         /*!\brief Computes the kinetic energy. */
         virtual double ekin() { return 0; };
+        /*!\brief Imprint an integer winding number. */
+        virtual void imprint(int l) {};
     protected:
         cvm::srbmatrix _H0; //!<Single body hamiltonian, stored as a tridiagonal real matrix.
         cvm::cvector _psi;  //!<Groundstate wave function, stored as a complex vector.
@@ -175,6 +177,7 @@ class GPE2D : public GPE {
         void computePhase(std::complex<double> dt);
         void initialize(Expression *pot);
         double ekin();
+        void imprint(int l);
         /*!\brief Initialize resources for the FFT. */
         virtual void initializeFFT();
     protected:
