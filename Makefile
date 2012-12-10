@@ -7,8 +7,9 @@ install:
 tools:
 	cd tools && make all
 doc:
-	doxygen doc/Doxyfile
+	cd doc && make all
 clean:
 	cd src && make clean
 	cd tools && make clean
+	cd doc && make clean
 	rm -rf bin/*

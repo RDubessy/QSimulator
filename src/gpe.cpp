@@ -584,7 +584,7 @@ double GPE1D::norm(cvm::cvector &psi) const {
 /* }}} */
 /* plot method {{{ */
 void GPE1D::plot(int nmodes, std::string &name) {
-    std::ofstream file("/tmp/psi.txt");
+    std::ofstream file("/tmp/psi_x.txt");
     std::ifstream spectrum(name.c_str());
     std::complex<double> *u=0;
     std::complex<double> *v=0;
@@ -615,7 +615,7 @@ void GPE1D::plot(int nmodes, std::string &name) {
         }
         file.close();
     } else {
-        std::cerr << "[E] Can't open file \"/tmp/psi.txt\" !" << std::endl;
+        std::cerr << "[E] Can't open file \"/tmp/psi_x.txt\" !" << std::endl;
     }
     //Fourier space output
     std::ofstream file2("/tmp/psi_p.txt");
