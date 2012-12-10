@@ -288,6 +288,7 @@ void GPE::evolve(double tstart, double dttest, double tend, std::string &name) {
     int c=0;
     update(t);
     computePhase(dt);
+    std::cout.precision(15);
     while(t<tend) {
         doStep(dt);
         if(c%100==0) {
@@ -342,6 +343,7 @@ void GPE::update(double t) {
 /* measure method {{{ */
 std::string GPE::measure() {
     std::ostringstream mes;
+    mes.precision(15);
     mes << epot() << ' ' << ekin();
     std::string res=mes.str();
     return res;
@@ -615,6 +617,21 @@ void GPE1D::plot(int nmodes, std::string &name) {
     } else {
         std::cerr << "[E] Can't open file \"/tmp/psi.txt\" !" << std::endl;
     }
+    //Fourier space output
+    std::ofstream file2("/tmp/psi_p.txt");
+    if(file2.is_open()) {
+        fftw_execute(_planFFT);
+        const std::complex<double> *psi=_psip;
+        for(int i=0;i<_n;i++) {
+            double k=0.5/_xmax*(i<_n/2?i:i-_n);
+            file2 << k << ' ' << psi[i].real() << ' ' << psi[i].imag();
+            file2 << '\n';
+        }
+        file2.close();
+    } else {
+        std::cerr << "[E] Can't open file \"/tmp/psi_p.txt\" !" << std::endl;
+    }
+    //Gnuplot interface
     std::cout << "set style data lines;"
         << "set xlabel \"x\";set ylabel \"Density\";"
         << "plot \"/tmp/psi.txt\" using 1:($2*$2+$3*$3) title \"\"";
@@ -662,7 +679,8 @@ state GPE1D::getHeader(std::ifstream &file) {
 void GPE1D::computePhase(std::complex<double> dt) {
     double scale=1./_n;
     for(int i=0;i<_n;i++) {
-        double k2=2*(cos((2*pi*i)/_n)-1)/(_dx*_dx);
+        double kx=2*pi/(_dx*_n)*(i<_n/2?i:i-_n);
+        double k2=-kx*kx;
         _phase[i]=scale*exp(dt*_kterm*k2);
     }
 }
@@ -847,10 +865,12 @@ state GPE2D::getHeader(std::ifstream &file) {
 void GPE2D::computePhase(std::complex<double> dt) {
     double scale=1./(_nx*_ny);
     for(int j=0;j<_ny;j++) {
-        double k2y=(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
+        double ky=2*pi/(_dy*_ny)*(j<_ny/2?j:j-_ny);
+        double k2y=ky*ky;
         for(int i=0;i<_nx;i++) {
-            double k2x=(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
-            double k2=2*(k2x+k2y);
+            double kx=2*pi/(_dx*_nx)*(i<_nx/2?i:i-_nx);
+            double k2x=kx*kx;
+            double k2=-(k2x+k2y);
             _phase[i+j*_nx]=scale*exp(dt*_kterm*k2);
         }
     }
@@ -980,12 +1000,12 @@ void GPE2DROT::computePhase(std::complex<double> dt) {
     double yo=0.5*(_ny-1);
     for(int j=0;j<_ny;j++) {
         double y=j-yo;
-        double k2y=2*(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
-        double ky=sin((2*pi*j)/_ny);
+        double ky=2*pi/(_dy*_ny)*(j<_ny/2?j:j-_ny);
+        double k2y=-ky*ky;
         for(int i=0;i<_nx;i++) {
             double x=i-xo;
-            double k2x=2*(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
-            double kx=sin((2*pi*i)/_nx);
+            double kx=2*pi/(_dx*_nx)*(i<_nx/2?i:i-_nx);
+            double k2x=-kx*kx;
             _phase[i+j*_nx]=scale*exp(dt*(_kterm*k2x-_oterm*y*kx));
             _phase2[i+j*_nx]=exp(dt*(_kterm*k2y+_oterm*x*ky));
         }
@@ -1201,12 +1221,15 @@ state GPE3D::getHeader(std::ifstream &file) {
 void GPE3D::computePhase(std::complex<double> dt) {
     double scale=1./(_nx*_ny*_nz);
     for(int k=0;k<_nz;k++) {
-        double k2z=(cos((2*pi*k)/_nz)-1)/(_dz*_dz);
+        double kz=2*pi/(_dz*_nz)*(k<_nz/2?k:k-_nz);
+        double k2z=kz*kz;
         for(int j=0;j<_ny;j++) {
-            double k2y=(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
+            double ky=2*pi/(_dy*_ny)*(j<_ny/2?j:j-_ny);
+            double k2y=ky*ky;
             for(int i=0;i<_nx;i++) {
-                double k2x=(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
-                double k2=2*(k2x+k2y+k2z);
+                double kx=2*pi/(_dx*_nx)*(i<_nx/2?i:i-_nx);
+                double k2x=kx*kx;
+                double k2=-(k2x+k2y+k2z);
                 _phase[i+(j+k*_ny)*_nx]=scale*exp(dt*_kterm*k2);
             }
         }
@@ -1329,15 +1352,16 @@ void GPE3DROT::computePhase(std::complex<double> dt) {
     double xo=0.5*(_nx-1);
     double yo=0.5*(_ny-1);
     for(int k=0;k<_nz;k++) {
-        double k2z=2*(cos((2*pi*k)/_nz)-1)/(_dz*_dz);
+        double kz=2*pi/(_dz*_nz)*(k<_nz/2?k:k-_nz);
+        double k2z=-kz*kz;
         for(int j=0;j<_ny;j++) {
             double y=j-yo;
-            double k2y=2*(cos((2*pi*j)/_ny)-1)/(_dy*_dy);
-            double ky=sin((2*pi*j)/_ny);
+            double ky=2*pi/(_dy*_ny)*(j<_ny/2?j:j-_ny);
+            double k2y=-ky*ky;
             for(int i=0;i<_nx;i++) {
                 double x=i-xo;
-                double k2x=2*(cos((2*pi*i)/_nx)-1)/(_dx*_dx);
-                double kx=sin((2*pi*i)/_nx);
+                double kx=2*pi/(_dx*_nx)*(i<_nx/2?i:i-_nx);
+                double k2x=-kx*kx;
                 _phase[i+(j+k*_ny)*_nx]=scale*exp(dt*(_kterm*(k2x+k2z)-_oterm*y*kx));
                 _phase2[i+(j+k*_ny)*_nx]=exp(dt*(_kterm*k2y+_oterm*x*ky));
             }

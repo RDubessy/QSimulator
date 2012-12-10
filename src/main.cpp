@@ -72,8 +72,8 @@ int mainFunction(ConfigMap &config) {
     }
     if(config.find("groundstate")!=config.end()) {
         double dt=getConfig(config,string("general::dt"),1e-3);
-        double tol=getConfig(config,string("general::tol"),1e-8);
-        double dttol=getConfig(config,string("general::dttol"),0.9999);
+        double tol=getConfig(config,string("general::tol"),1e-12);
+        double dttol=getConfig(config,string("general::dttol"),0.999);
         gpe->findGroundState(dt,tol,dttol,log);
         gpe->save(out);
     }
