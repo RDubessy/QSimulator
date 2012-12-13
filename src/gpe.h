@@ -1,3 +1,4 @@
+/* Copyright (C) 2012 Romain Dubessy */
 #ifndef GPE_H
 #define GPE_H
 #include <cvm.h>

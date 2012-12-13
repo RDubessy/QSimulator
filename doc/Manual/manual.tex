@@ -1,12 +1,14 @@
 \documentclass[12pt,a4paper]{report}
 \usepackage[utf8]{inputenc}
 \usepackage[english]{babel}
-\usepackage{hyperref}
 \usepackage{amsmath,amsfonts,amssymb}
 \usepackage{verbatim}
 \usepackage{bm}
+
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows}
+
+\usepackage{hyperref}
 
 \author{Romain Dubessy}
 \title{Quantum Simulator -- Reference Manual}
@@ -20,7 +22,10 @@
 
 \begin{document}
 \maketitle
-\cleardoublepage
+\begin{abstract}
+This document is the user's manual of the \qsimu code.
+See section~\ref{sec:doc} to generate the programming reference, relative to the source code.
+\end{abstract}
 \begin{table}
 \begin{center}
 \begin{tabular}{c|l}
@@ -48,9 +53,10 @@ Instead of trying to solve Eq.~\eqref{eqn:gpe} with stable algorithms that prese
 \begin{eqnarray}
 \psi(\bm{r},t)&=&U(t,t_0)\psi(\bm{r},t_0),\\
 U(t,t_0)&=&\exp{-\imath\int_{t_0}^t\frac{dt^\prime}{\hbar}\left(-\frac{\hbar^2}{2m}\Delta+V(\bm{r},t^\prime)+gN\abs{\psi(\bm{r},t^\prime)}^2\right)}.
+\label{eqn:evolution}
 \end{eqnarray}
 \end{subequations}
-This is explained in section~\ref{seq:integrator}
+This is explained with many details in section~\ref{sec:integrator}.
 
 \section{Installation instructions}
 First you need to get a working copy of the program.
@@ -72,13 +78,24 @@ $ qsimu --usage
 \end{verbatim}
 which should display some basics about the usage of \qsimu.
 
+\subsection{\label{sec:doc}Getting more documentation}
+The code documentation is contained directly in the source files and can be rendered in a more readable way by using the \texttt{Doxygen} tool.
+Assuming that \texttt{Doxygen} is installed and properly configured, you can generate the code documentation (as well as the latest version of this reference guide) by issuing:
+\begin{verbatim}
+$ make doc
+\end{verbatim}
+in the root directory.
+All the related documentation is then placed in the \texttt{doc/} folder, where you will find the reference manual (file \texttt{QSimulator.pdf}) and the code documentation (web pages starting at \texttt{html/index.html}).
+
 \section{Tutorials}
+The examples presented here correspond to configuration files in the \texttt{examples/} directory of the program sources.
+
 \subsection{One dimensional harmonic oscillator}
 \subsubsection{Defining the problem}
 We are interested in the well known harmonic oscillator problem, in one dimension, that can be used as a sandbox to learn how to use \qsimu. 
 In this case Eq.~\eqref{eqn:gpe} reduces to:
 \begin{equation}
-\imath\hbar\frac{\partial}{\partial t}\psi(t,x)=\left(-\frac{\hbar^2}{2m}\frac{\partial^2}{\partial x^2}+\frac{1}{2}m\omega_x^2 x^2\right)\psi(t,x),
+\imath\hbar\frac{\partial}{\partial t}\psi(x,t)=\left(-\frac{\hbar^2}{2m}\frac{\partial^2}{\partial x^2}+\frac{1}{2}m\omega_x^2 x^2\right)\psi(x,t),
 \label{eqn:1dho}
 \end{equation}
 where $\omega_x$ is the trap frequency.
@@ -87,12 +104,12 @@ Now we will review, step by step, how to tell \qsimu to solve this problem: firs
 
 However, for the sake of simplicity, and because it often helps to understand the basic physics, we will now translate \eqref{eqn:1dho} in dimensionless units, using the new variables:
 \begin{equation*}
-x=a_xX,~t=\frac{T}{\omega_x}~\textrm{and}~\psi(x,t)=\frac{\Psi(T,X)}{\sqrt{a_x}},
+x=a_xX,~t=\frac{T}{\omega_x}~\textrm{and}~\psi(x,t)=\frac{\Psi(X,T)}{\sqrt{a_x}},
 \end{equation*}
 where $a_x=\sqrt{\frac{\hbar}{m\omega_x}}$ is the characteristic length of the harmonic oscillator.
 This results in:
 \begin{equation}
-\imath\frac{\partial}{\partial t}\Psi(T,X)=\left(-\frac{1}{2}\frac{\partial^2}{\partial x^2}+\frac{1}{2}X^2\right)\Psi(T,X).
+\imath\frac{\partial}{\partial T}\Psi(X,T)=\left(-\frac{1}{2}\frac{\partial^2}{\partial x^2}+\frac{1}{2}X^2\right)\Psi(X,T).
 \label{eqn:1dlho}
 \end{equation}
 Now the problem is well posed, and one can see that Eq.~\eqref{eqn:1dlho} has no free parameter: with the dimensional reduction we will be able to obtain results relevant for any (non zero) value of the trapping frequency!
@@ -182,7 +199,6 @@ where the three new lines stand for:
 \item\texttt{tol = 1e-12} the target relative error on the ground state energy,
 \item\texttt{dttol = 0.999} criteria to refine the time step.
 \end{itemize}
-This configuration file can be found in the \texttt{examples/} directory of the program sources.
 
 We are now ready to look for the ground state, hence we run \qsimu with the command line:
 \begin{verbatim}
@@ -224,6 +240,117 @@ $ qsimu harmonic1D.cfg --in=psi1.dat --plot
 \end{verbatim}
 This creates two files, located in the \texttt{/tmp/} directory, \texttt{psi\_x.txt} and \texttt{psi\_p.txt}, that contains two representations of the wave function in ascii format: in real and reciprocal spaces.
 
+
+\subsection{Three dimensional GPE in a harmonic trap}
+\subsubsection{Defining the problem}
+Let us turn now to the case of zero temperature degenerate Bose gas confined in a three dimensional harmonic pancake like trap:
+\begin{equation}
+\imath\frac{\partial}{\partial t}\psi(\bm{r},t)=
+\left(-\frac{\hbar^2}{2m}\Delta+\frac{m}{2}(\omega_\perp^2(x^2+y^2)+\omega_z^2z^2)
++gN\abs{\psi(\bm{r},t)}^2\right)\psi(\bm{r},t),
+\end{equation}
+where $g=\frac{4\pi\hbar^2}{m}a$ is the interaction strength and $N$ the atom number.
+Again we will work in dimensionless units using the natural length and energy scale of the vertical harmonic oscillator:
+\begin{equation}
+\imath\frac{\partial}{\partial T}\Psi(\bm{R},T)=\left(-\frac{\Delta}{2}
++\frac{1}{2}\left(\frac{\omega_\perp^2}{\omega_z^2}(X^2+Y^2)+Z^2\right)
++\frac{4\pi aN}{a_z}\abs{\Psi(\bm{R},T)}^2\right)\Psi(\bm{R},T),
+\label{eqn:3dlgpe}
+\end{equation}
+where $a_z=\sqrt{\frac{\hbar}{m\omega_z}}$, $\bm{r}=a_z\bm{R}$, $T=\omega_zt$ and $\psi(\bm{r},t)=\Psi(\bm{R},T)/a_z^{3/2}$.
+
+Contrary to the previous case, two free parameters remain in equation~\eqref{eqn:3dlgpe}, $\epsilon=\frac{\omega_\perp^2}{\omega_z^2}$ and $g0=\frac{4\pi aN}{a_0}$, for which we have to provide numerical values to \qsimu.
+This will be done in the configuration file.
+
+\subsubsection{Writing the configuration file}
+We now create a new configuration file \texttt{gpe3D.cfg}:
+\begin{verbatim}
+[general]
+equation = -1/2*DELTA+VEXT+g0*RHO
+potential = 1/2*(eps*(X^2+Y^2)+Z^2)
+dt = 1e-3
+tol = 1e-12
+dttol = 0.999
+[grid]
+nx = 64
+ny = 64
+nz = 64
+Lx = 30
+Ly = 30
+Lz = 30
+[parameters]
+eps=(25/2000)^2
+g0=N*eta
+eta=0.276
+N=20000
+\end{verbatim}
+The main new features of this file are:
+\begin{itemize}
+\item the introduction of a new section with the codeword \texttt{[parameters]} that allow to introduce parameters in the \texttt{equation} or the \texttt{potential} definitions.
+\item the new term proportional to \texttt{RHO} describing the interactions,
+\item a straightforward extension of the previous notations to a three dimensional grid along directions \texttt{X}, \texttt{Y}, \texttt{Z}.
+\end{itemize}
+The parameter specifications provide great flexibility to the configuration file.
+Note however that they must be used with caution: an undefined parameter will cause \qsimu to exit.
+
+Here the chosen numerical values correspond to trap frequencies of $\omega_\perp=2\pi\times25$~Hz and $\omega_z=2\pi\times2000$~Hz and atom number of $20\times10^4$.
+
+\subsubsection{Studying the ground state}
+
+\chapter{Configuration file}
+Note that the configuration file is parsed line after line, so that expressions should be defined on a single line. Empty spaces or tabulations are discarded, as well as everything following the symbol \texttt{\#} that can be used to write comments in the file.
+
+\section{Codewords}
+Hereafter is the list of all the configuration file reserved words that have a special meaning for the program.
+User defined parameters should bear other names.
+For convenience the following list is alphabetically sorted.
+\begin{itemize}
+\item \texttt{DELTA} represents the Laplacian in the \texttt{equation}. It is implicitly defined by the choice of coordinate system in the \texttt{potential} assignation.
+\item \texttt{equation = ...} represents the integrand of the evolution operator defined in equation~\eqref{eqn:evolution}. It should be written in the form:\\ \texttt{equation = A*DELTA+B*VEXT+C*RHO+D*LZ}, where \texttt{A}, \texttt{B}, \texttt{C} and \texttt{D} are user defined parameters.
+\item \texttt{[general]} is label indicating the general configuration options.
+\item \texttt{[grid]} is a label indicating the beginning of the spatial grid definition.
+\item \texttt{LZ} represents the projection along the z axis of the angular momentum operator. It can be used to simulate a rotating frame. 
+\item \texttt{[parameters]} is a label indicating the beginning of the user defined parameters assignation.
+\item \texttt{potential = ...} defines the spatial dependence of the trapping potential. It can use either Cartesian coordinates (\texttt{X}, \texttt{Y} and \texttt{Z}) or cylindrical coordinates (\texttt{R}, \texttt{THETA}, \texttt{Z}), that may by combined using mathematical expressions.
+\item \texttt{RHO} represents an interaction term proportional to the local particle density.
+\item \texttt{VEXT} represents the external trapping potential in the \texttt{equation}. Its value is defined in the \texttt{potential} assignation.
+\end{itemize}
+
+\section{Mathematical expressions}
+It is possible to use arbitrary mathematical expressions in the configuration file.
+These are parsed using an external library capable of recognizing: elementary operations, variables and simple mathematical functions, according to a specific syntax.
+Mathematical expressions may be grouped or delimited by matching pairs of parenthesis \texttt{(...)} that may be nested to an arbitrary level.
+
+\subsection{Elementary operation}
+The elementary operation currently supported are:
+\begin{itemize}
+\item \texttt{+} addition,
+\item \texttt{-} subtraction,
+\item \texttt{*} multiplication,
+\item \texttt{/} division,
+\item \texttt{\^} power.
+\end{itemize}
+Note that the usual algebra rules apply (distributive, associative and commutative properties).
+
+\subsection{Mathematical functions}
+Mathematical functions are written as \texttt{Name[...]} where \texttt{Name} is a short name for the function and the argument is written between square brackets \texttt{[...]}.
+The functions implementations rely on the standard mathematical library of your operating system.
+
+The mathematical function currently supported are:
+\begin{itemize}
+\item \texttt{Exp[...]} the exponential function,
+\item \texttt{Sqrt[...]} the square root function,
+\item \texttt{Erf[...]} the error function,
+\item \texttt{Cos[...]} the cosine function,
+\item \texttt{Sin[...]} the sine function,
+\item \texttt{Tan[...]} the tangent function,
+\item \texttt{Cosh[...]} the hyperbolic cosine function,
+\item \texttt{Sinh[...]} the hyperbolic sine function,
+\item \texttt{Tanh[...]} the hyperbolic tangent function.
+\end{itemize}
+
+\section{Coordinate systems and grid definition}
+
 \chapter{Numerical methods}
 \section{\label{sec:integrator}Split operator and fast Fourier transforms}
 \section{Imaginary time propagation}
@@ -259,4 +386,5 @@ This creates two files, located in the \texttt{/tmp/} directory, \texttt{psi\_x.
 
 \appendix
 \chapter{Getting more by using scripts}
+
 \end{document}

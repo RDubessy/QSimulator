@@ -21,3 +21,4 @@ do
     j=`echo 'scale='$i';1.0-10^(-'$i')' | bc`
     $bin $cfg --groundstate --in=$dir/psi0.dat --out=$dir/psi0.dat --general::dttol=$j $optarg2
 done
+# init.sh

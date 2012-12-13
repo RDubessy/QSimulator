@@ -25,3 +25,4 @@ echo "Creating the movie"
 mencoder "mf://$1/*.jpg" -mf fps=10 -o movie.avi -ovc lavc -lavcopts vcodec=msmpeg4v2:vbitrate=800
 echo "Cleaning auxiliary files"
 rm -f $1/*.png*
+# movie.sh

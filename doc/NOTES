@@ -1,0 +1,155 @@
+/*!\mainpage Quantum simulation software.
+This program is designed to study the Non-Linear Schrodinger Equation (NLSE) 
+which is relevant, for instance, to describe Bose-Einstein Condensates.
+
+\section install Installation
+In the source directory of this software simply issue the commands:
+\verbatim
+$ make all
+$ sudo make install
+\endverbatim
+A working copy of the program should now be installed in the /opt/bin/
+directory.
+
+\section usage Usage
+In this section we assume that the program is build and installed according
+to the procedure described in Section \ref install.
+
+\subsection cmdline Command line invocation
+To invoke the program you will need to issue a command of the form:
+\verbatim
+$ qsimu CONFIG_FILE [OPTIONS] [ACTIONS]
+\endverbatim
+where:
+- \verbatim CONFIG_FILE\endverbatim is a configuration file,
+- \verbatim[OPTIONS]\endverbatim is a list of options,
+- \verbatim[ACTIONS]\endverbatim is a list of actions.
+
+Please note that only the configuration file is necessary to run the program
+otherwise you will get an error, but it will perform something usefull only if
+you select an action.
+To get more information on the options or actions see:
+\verbatim
+$ qsimu --usage
+\endverbatim
+
+\subsection config Configuration file
+The configuration file provides the necessary informations to initialize the 
+program using a specific syntax. This file is cut into fields, labelled by a 
+keyword between square brackets, which consists in a list of assignment.
+
+The assignments are of the form: keyword=value, where value is either a string,
+a constant or a mathematical expression.
+
+The allowed fields are:
+- [general] with the assignments:
+    - equation=mathematical expression,
+    - potential=mathematical expression,
+    - dt=constant,
+    - tol=constant,
+    - dttol=constant,
+- [grid] with one of this sets of assignments:
+    - For cartesian problems (coordinates X, Y, Z):
+        - nx=integer constant,
+        - ny=integer constant,
+        - nz=integer constant,
+        - Lx=constant,
+        - Ly=constant,
+        - Lz=constant,
+    - For polar coordinates problems (coordinate R):
+        - nr=integer constant,
+        - rmin=constant,
+        - rmax=constant.
+- [parameters] (optional) contains all the user defined literal constants used
+in the "equation" or "potential" assignments.
+
+\subsection tutorial Tutorials
+This section explains how to use the program to study some typical equations.
+
+\subsubsection harmonic One dimensionnal harmonic oscillator
+Lets assume we want to study a single particle, described by its wavefunction
+\f$\left|\psi(t,x)\right>\f$, trapped in a harmonic potential and evolving
+according to the Schrodinger equation:
+\f[
+\imath\hbar\frac{\partial}{\partial t}\left|\psi(t,x)\right>
+=\left(-\frac{\hbar^2}{2m}\frac{\partial^2}{\partial x^2}
++\frac{1}{2}m\omega_x^2x^2\right)\left|\psi(t,x)\right>.
+\f]
+For the sake of simplicity we will work with dimensionless units (note
+that it is only for convinience and not a constraint of the program) let us 
+define:
+\f[
+X=\frac{x}{a_x},~T=\omega_xt,~\textrm{and}~
+\left|\Psi(T,X)\right>=\sqrt{a_x}\left|\psi(t,x)\right>,
+\f]
+where \f$a_x=\sqrt{\frac{\hbar}{m\omega_x}}\f$ is the caracteristic length of
+the harmonic oscillator.
+One can thus write the Schrodinger equation in the form:
+\f[
+\imath\frac{\partial}{\partial T}\left|\Psi(T,X)\right>
+=\left(-\frac{1}{2}\frac{\partial^2}{\partial X^2}
++\frac{1}{2}X^2\right)\left|\Psi(T,X)\right>.
+\f]
+Let say we want to find the ground state of this system, find the time evolution
+of an initial wavefunction or compute find the excited states of the system.
+Now how to address these problems with the program ?
+
+First, we need to define the problem, so we create (or modify) a configuration
+file so that it contains:
+\verbatim
+[general]
+equation=-1/2*DELTA+VEXT
+potential=1/2*X^2
+\endverbatim
+What does that mean ? Let us see, line by line:
+- \verbatim [general]\endverbatim is a label to tell the program that this part will
+define the problem,
+- \verbatim equation=-1/2*DELTA+VEXT\endverbatim is the right hand side of the
+dimensionless Schrodinger equation written above,
+- \verbatim potential=1/2*X^2\endverbatim defines the potential (in the correct
+units).
+
+Why is it written this way ? Mainly for technical issues: we want to split the
+right hand side of the Schrodinger equation into two parts: the first for the
+kinetic energy and the second for the potential energy. This will prove usefull
+when using the split operator method to compute the system evolution. Note that
+VEXT is defined in the last line as the harmonic potential and that DELTA is
+implictly defined as the Laplacian.
+
+The next thing to do is to define the spatial grid on which we discretize the
+wavefunction. This is done by modifying the configuration file:
+\verbatim
+[general]
+equation=-1/2*DELTA+VEXT
+potential=1/2*X^2
+[grid]
+nx=128
+Lx=16
+\endverbatim
+We now see a new label that informs the program that the next section will be
+used to define the grid, in a straigthforward way, by giving the number of
+points and the size of the box.
+Note that the grid is symmetric about the point X=0 and that the size Lx
+is expressed in the length unit used in the Schrodinger equation.
+
+Now how to choose the size of the box or the number of grid points ? This is a
+good question that needs to be treated carefully. In the real space we need
+enough points to accuratly describe the wavefunction:
+\f[
+\frac{L_x}{n_x}\ll\Delta X\ll\frac{L_x}{2},
+\f]
+where \f$\Delta X\f$ is the rms width of the wavefunction probability 
+distribution. Reciprocally, in the Fourier space we have:
+\f[
+\frac{1}{L_x}\ll\Delta K\ll\frac{n_x}{2L_x}.
+\f]
+
+A good appoach is then to consider that we need to take into account the 
+Heisenberg uncertainty principle:
+\f[
+\Delta X \Delta K\geq\frac{1}{2}.
+\f]
+
+Finally let us point out that it is preferable (for numerical reasons) to use a
+number of grid points that can be expressed as some power of 2.
+*/
