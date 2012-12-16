@@ -100,7 +100,6 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name)
     int c=0;
     int p=1;
     double dt=dttest;
-    double muOld=1e3;
     double eps=1.0;
     double ttol=0.01;
     std::ofstream file(name.c_str());
@@ -122,15 +121,15 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name)
                 //Update the phase
                 computePhase(std::complex<double>(-dt,0));
             } else {
-                double mu=-log(tmp)/dt;
-                eps=std::abs((mu-muOld)/muOld);
-                muOld=mu;
+                double deltamu=-log(tmp)/dt;
+                _mu+=deltamu;
+                eps=std::abs(deltamu/_mu);
             }
             c++;
             if(logout && c%100==0)
-                file << c << ' ' << tmp << ' ' << dt << ' ' << muOld << ' ' << eps << '\n';
+                file << c << ' ' << tmp << ' ' << dt << ' ' << _mu << ' ' << eps << '\n';
         }
-        std::cerr << ", done: " << eps << ", mu=" << muOld << std::endl;
+        std::cerr << ", done: " << eps << ", mu=" << _mu << std::endl;
         ttol/=10;
         p++;
         dt=dttest;
@@ -139,7 +138,6 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name)
     }
     if(logout)
         file.close();
-    _mu=muOld;
     std::cerr << "[I] After "<< c << " iterations, mu=" << _mu << " [" << eps << "]." << std::endl;
     return;
 }
@@ -361,7 +359,7 @@ void GPE::update(double t) {
 std::string GPE::measure() {
     std::ostringstream mes;
     mes.precision(15);
-    mes << epot() << ' ' << ekin();
+    mes << _mu << ' ' << epot() << ' ' << ekin();
     std::string res=mes.str();
     return res;
 }
@@ -649,13 +647,20 @@ void GPE1D::plot(int nmodes, std::string &name) {
         std::cerr << "[E] Can't open file \"/tmp/psi_p.txt\" !" << std::endl;
     }
     //Gnuplot interface
-    std::cout << "set style data lines;"
+    std::cout << "set size 1,1;set origin 0,0;unset key;"
+        << "set multiplot layout 1,2;"
         << "set xlabel \"x\";set ylabel \"Density\";"
-        << "plot \"/tmp/psi.txt\" using 1:($2*$2+$3*$3) title \"\"";
+        << "plot \"/tmp/psi_x.txt\" using 1:($2**2+$3**2);"
+        << "set xlabel \"k_x\";set ylabel \"Density\";"
+        << "plot \"/tmp/psi_p.txt\" using 1:($2**2+$3**2);"
+        << "unset multiplot;";
+    /*
     for(int i=0;i<nmodes;i++) {
         std::cout << ",\"\" using 1:(2*$2*($" << 2*i+4 << "+$" << 2*i+5 << ")) title \"\"";
     }
-    std::cout << ";pause mouse\n";
+    std::cout << ";";
+    */
+    std::cout << "pause mouse\n";
     std::cout.flush();
     return;
 }
@@ -738,6 +743,20 @@ void GPE1D::initialize(Expression *pot) {
     //Copy initial state into memory
     _psi=cvm::cvector(psi,_n);
     delete[] psi;
+}
+/* }}} */
+/* ekin method {{{ */
+double GPE1D::ekin() {
+    fftw_execute(_planFFT);
+    double res=0.;
+    double n2=0.;
+    for(int i=0;i<_n;i++) {
+        double kx=2*pi/(_dx*_n)*(i<_n/2?i:i-_n);
+        double psi2=std::norm(_psip[i]);
+        res+=-_kterm*kx*kx*psi2;
+        n2+=psi2;
+    }
+    return res/n2;
 }
 /* }}} */
 /* }}} */

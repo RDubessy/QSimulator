@@ -151,6 +151,7 @@ class GPE1D : public GPE {
         state getHeader(std::ifstream &file);
         void computePhase(std::complex<double> dt);
         void initialize(Expression *pot);
+        double ekin();
     private:
         double _xmax;   //!<Half box size.
         double _dx;     //!<Grid step size.
