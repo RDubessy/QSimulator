@@ -76,7 +76,7 @@ according to the Schrodinger equation:
 +\frac{1}{2}m\omega_x^2x^2\right)\left|\psi(t,x)\right>.
 \f]
 For the sake of simplicity we will work with dimensionless units (note
-that it is only for convinience and not a constraint of the program) let us 
+that it is only for convenience and not a constraint of the program) let us 
 define:
 \f[
 X=\frac{x}{a_x},~T=\omega_xt,~\textrm{and}~

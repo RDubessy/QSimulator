@@ -17,8 +17,10 @@
 \newcommand{\qsimu}{\texttt{qsimu}\,}
 \newcommand{\fft}[1]{\mathcal{F}\left[#1\right]}
 \newcommand{\ket}[1]{\left|#1\right>}
+\newcommand{\mean}[1]{\left<#1\right>}
 
 \renewcommand{\exp}[1]{\textrm{exp}\left[#1\right]}
+\renewcommand{\ln}[1]{\textrm{ln}\left[#1\right]}
 
 \begin{document}
 \maketitle
@@ -34,6 +36,7 @@ $\bm{r}$ & n-dimensional vector\\
 $\Delta$ & n-dimensional Laplacian\\
 $t$ & Time (in physical units)\\
 $m$ & Mass\\
+$\hbar=\frac{h}{2\pi}$ & Reduced Planck constant\\
 \hline
 \end{tabular}
 \caption{\label{tab:notations}Some common notation used throughout this document.}
@@ -60,9 +63,25 @@ This is explained with many details in section~\ref{sec:integrator}.
 
 \section{Installation instructions}
 First you need to get a working copy of the program.
+The code is freely available from a \texttt{git} repository and you can recover the latest stable version with the command:
+\begin{verbatim}
+$ git clone http://github.com/RDubessy/QSimulator.git
+\end{verbatim}
+This create a folder \texttt{QSimulator} in your local directory that contains the sources of the program.
+
 The rest of the installation procedure depends on your operating system.
 
+\subsection{Dependencies}
+For convenience \qsimu uses dynamically linked external library that provides useful functionalities with optimized code:
+\begin{itemize}
+\item \texttt{fftw3} a fast Fourier transform library, available at \url{http://www.fftw3.org},
+\item \texttt{cvmlib} a \texttt{C++} interface to the famous fortran based linear algebra packages \texttt{blas} and \texttt{lapack}, available at \url{http://www.cvmlib.org},
+\item two miscellaneous libraries for the interface with command line options and configuration file, available at \url{http://github.com/RDubessy/MyLibraries},
+\end{itemize}
+\qsimu assumes that the library files are located in the \texttt{/opt/lib} directory with the corresponding header files in \texttt{/opt/include}.
+
 \subsection{Windows}
+Not yet working...
 
 \subsection{Unix/BSD}
 In the root directory issue the commands:
@@ -70,7 +89,7 @@ In the root directory issue the commands:
 $ make
 $ sudo make install
 \end{verbatim}
-you should now have a working copy of the program in the \texttt{/opt/bin} folder.
+you should now have a working copy of the program in the \texttt{/usr/local/bin} folder.
 
 To test if everything is fine, you can try:
 \begin{verbatim}
@@ -213,22 +232,23 @@ This command generate a lot of output:
 [I] Getting parameters:
 [I] Initializing a 1D Cartesian system
 [I] Find groundstate method...
-[I]	pass #1 objective: 0.01, done: 0.0098929, mu=0.741268
-[I]	pass #2 objective: 0.001, done: 0.000995262, mu=0.561524
-[I]	pass #3 objective: 0.0001, done: 9.97054e-05, mu=0.510478
-[I]	pass #4 objective: 1e-05, done: 9.98158e-06, mu=0.501222
-[I]	pass #5 objective: 1e-06, done: 9.99139e-07, mu=0.500122
-[I]	pass #6 objective: 1e-07, done: 9.99269e-08, mu=0.500012
-[I]	pass #7 objective: 1e-08, done: 9.96855e-09, mu=0.500001
-[I]	pass #8 objective: 1e-09, done: 9.97257e-10, mu=0.5
-[I]	pass #9 objective: 1e-10, done: 9.81927e-11, mu=0.5
-[I]	pass #10 objective: 1e-11, done: 9.10838e-12, mu=0.5
-[I]	pass #11 objective: 1e-12, done: 4.44311e-13, mu=0.5
-[I] After 3362 iterations, mu=0.5 [4.44311e-13].
+[I]	pass #1 objective: 0.01, done: 3.06735e-05, mu=0.813096
+[I]	pass #2 objective: 0.001, done: 3.06735e-05, mu=0.813096
+[I]	pass #3 objective: 0.0001, done: 3.06735e-05, mu=0.813096
+[I]	pass #4 objective: 1e-05, done: 9.98171e-06, mu=0.501222
+[I]	pass #5 objective: 1e-06, done: 9.99144e-07, mu=0.500122
+[I]	pass #6 objective: 1e-07, done: 9.9928e-08, mu=0.500012
+[I]	pass #7 objective: 1e-08, done: 9.9689e-09, mu=0.500001
+[I]	pass #8 objective: 1e-09, done: 9.97424e-10, mu=0.5
+[I]	pass #9 objective: 1e-10, done: 9.99201e-11, mu=0.5
+[I]	pass #10 objective: 1e-11, done: 9.32587e-12, mu=0.5
+[I]	pass #11 objective: 1e-12, done: 2.22045e-13, mu=0.5
+[I] After 3372 iterations, mu=0.5 [2.22045e-13].
 \end{verbatim}
 which we will not comment here but as long as you get lines starting with \texttt{[I]} (information) and not \texttt{[W]} (warning) or even worse \texttt{[E]} (error), everything is fine.
 
-At the end, we see that the algorithm has converged to a value of the energy denoted here \texttt{mu}\footnote{For single particle problems \texttt{mu} stands for the energy while for interacting particles problem it will represent the chemical potential $\mu$.} of $0.5\pm4.44311\times10^{-13}$, compatible with the expected theoretical value of $\frac{1}{2}$.
+At the end, we see that the algorithm has converged to a value of the energy denoted here \texttt{mu}\footnote{For single particle problems \texttt{mu} stands for the energy while for interacting particles problem it will represent the chemical potential $\mu$.} of $0.49999991666684$, compatible with the expected theoretical value of $\frac{1}{2}$.
+Note that the criterion for convergence does not give an accurate estimate of the absolute error on \texttt{mu}: in practice it is difficult to have a relative error below $10^{-7}$.
 
 The printed information is not the only output file: in the current directory a new file has appeared \texttt{psi1.dat} that contains in a binary format the found ground state.
 
@@ -243,7 +263,7 @@ This creates two files, located in the \texttt{/tmp/} directory, \texttt{psi\_x.
 
 \subsection{Three dimensional GPE in a harmonic trap}
 \subsubsection{Defining the problem}
-Let us turn now to the case of zero temperature degenerate Bose gas confined in a three dimensional harmonic pancake like trap:
+Let us turn now to the case of a zero temperature degenerate Bose gas confined in a three dimensional harmonic pancake like trap:
 \begin{equation}
 \imath\frac{\partial}{\partial t}\psi(\bm{r},t)=
 \left(-\frac{\hbar^2}{2m}\Delta+\frac{m}{2}(\omega_\perp^2(x^2+y^2)+\omega_z^2z^2)
@@ -266,23 +286,23 @@ This will be done in the configuration file.
 We now create a new configuration file \texttt{gpe3D.cfg}:
 \begin{verbatim}
 [general]
-equation = -1/2*DELTA+VEXT+g0*RHO
+equation = -1/2*DELTA+VEXT+g*RHO
 potential = 1/2*(eps*(X^2+Y^2)+Z^2)
 dt = 1e-3
 tol = 1e-12
 dttol = 0.999
 [grid]
-nx = 64
-ny = 64
-nz = 64
-Lx = 30
-Ly = 30
-Lz = 30
+nx = 32
+ny = 32
+nz = 32
+Lx = 256
+Ly = 256
+Lz = 16
 [parameters]
 eps=(25/2000)^2
-g0=N*eta
-eta=0.276
+g=N*eta
 N=20000
+eta=0.276
 \end{verbatim}
 The main new features of this file are:
 \begin{itemize}
@@ -300,7 +320,7 @@ Here the chosen numerical values correspond to trap frequencies of $\omega_\perp
 \chapter{Configuration file}
 Note that the configuration file is parsed line after line, so that expressions should be defined on a single line. Empty spaces or tabulations are discarded, as well as everything following the symbol \texttt{\#} that can be used to write comments in the file.
 
-\section{Codewords}
+\section{\label{sec:codewords}Codewords}
 Hereafter is the list of all the configuration file reserved words that have a special meaning for the program.
 User defined parameters should bear other names.
 For convenience the following list is alphabetically sorted.
@@ -334,9 +354,9 @@ Note that the usual algebra rules apply (distributive, associative and commutati
 
 \subsection{Mathematical functions}
 Mathematical functions are written as \texttt{Name[...]} where \texttt{Name} is a short name for the function and the argument is written between square brackets \texttt{[...]}.
-The functions implementations rely on the standard mathematical library of your operating system.
+The functions implementation rely on the standard mathematical library of your operating system.
 
-The mathematical function currently supported are:
+The mathematical functions currently supported are:
 \begin{itemize}
 \item \texttt{Exp[...]} the exponential function,
 \item \texttt{Sqrt[...]} the square root function,
@@ -350,9 +370,37 @@ The mathematical function currently supported are:
 \end{itemize}
 
 \section{Coordinate systems and grid definition}
+The coordinate system used for the computation is implicitly defined by the expression of the trapping potential.
+This potential may be expressed either in Cartesian coordinates (\texttt{X}, \texttt{Y} and \texttt{Z}) or cylindrical coordinates (\texttt{R}, \texttt{THETA}, \texttt{Z}).
+The choice of the coordinate system defines the Laplacian \texttt{DELTA}.
+The current implementation of the program allows for:
+\begin{itemize}
+\item \texttt{X}: one dimensional problem with $\Delta=\frac{\partial^2}{\partial x^2}$,
+\item \texttt{X}, \texttt{Y}: two dimensional problem with $\Delta=\frac{\partial^2}{\partial x^2}+\frac{\partial^2}{\partial y^2}$,
+\item \texttt{X}, \texttt{Y}, \texttt{Z}: three dimensional problem with $\Delta=\frac{\partial^2}{\partial x^2}+\frac{\partial^2}{\partial y^2}+\frac{\partial^2}{\partial z^2}$,
+\item \texttt{R}: one dimensional polar problem with $\Delta=\frac{\partial^2}{\partial r^2}+\frac{1}{r}\frac{\partial}{\partial r}$.
+\end{itemize}
+
 
 \chapter{Numerical methods}
 \section{\label{sec:integrator}Split operator and fast Fourier transforms}
+The basic idea is to approximate the small step evolution operator $\delta U(t)=U(t+dt,t)$ by using a Trotter expansion:
+\begin{eqnarray*}
+\delta U(t)
+&=&\exp{-\imath\frac{dt}{\hbar}\left(-\frac{\hbar^2}{2m}\Delta
++V(\bm{r},t)+gN\abs{\psi(\bm{r},t)}^2\right)}\\
+&\simeq&\exp{\imath\frac{dt}{\hbar}\frac{\hbar^2}{2m}\Delta}
+\times
+\exp{-\imath\frac{dt}{\hbar}\left(V(\bm{r},t)+gN\abs{\psi(\bm{r},t)}^2\right)}
++\mathcal{O}\left(dt^2\right)\\
+%&+&\frac{dt^2}{2\hbar^2}\left(\left(V(\bm{r},t)+gN\abs{\psi(\bm{r},t)}^2\right)\frac{\hbar^2}{2m}\Delta-\frac{\hbar^2}{2m}\Delta\left(V(\bm{r},t)+gN\abs{\psi(\bm{r},t)}^2\right)\right)
+\end{eqnarray*}
+This formulation allows to keep a unitary evolution, with two successive steps, easy to evaluate respectively in the real and reciprocal spaces, at the cost of a small error of order $dt^2$.
+This error may be evaluated globally as:
+\begin{eqnarray*}
+\epsilon&=&-\frac{dt^2}{4m}\mean{\left[\Delta,V(\bm{r},t)+gN\abs{\psi(\bm{r},t)}^2\right]}.
+\end{eqnarray*}
+
 \section{Imaginary time propagation}
 \begin{figure}[htbp]
 \begin{center}
@@ -384,7 +432,63 @@ The mathematical function currently supported are:
 \end{center}
 \end{figure}
 
+\section{Spectrum of excitations}
+Assuming that $\psi_0(\bm{r})e^{-\imath\frac{\mu}{\hbar}t}$ is a stationary state of equation~\eqref{eqn:gpe}, with a time independant potential $V(\bm{r},t)=V(\bm{r})$, one can look for elementary excitations around this state in the form: $\psi(\bm{r},t)=e^{-\imath\frac{\mu}{\hbar}t}
+\left(\psi_0(\bm{r})+\delta\psi(\bm{r},t)\right)$.
+Assuming $\abs{\delta\psi(\bm{r},t)}\ll\abs{\psi_0(\bm{r})}$ and linearising equation~\eqref{eqn:gpe}, one get the following first order equation:
+\begin{equation}
+\imath\hbar\frac{\partial}{\partial t}\delta\psi(\bm{r},t)
+=\mathcal{L}\delta\psi(\bm{r},t)+gN\psi_0(\bm{r})^2\delta\psi(\bm{r},t)^*,
+\label{eqn:gpelin}
+\end{equation}
+where we introduced the operator:
+$\mathcal{L}=\left(-\frac{\hbar^2}{2m}\Delta+V(\bm{r})+2gN\abs{\psi_0(\bm{r})}^2-\mu\right)$.
+This equation is not linear in $\delta\psi(\bm{r},t)$ because of the term $\delta\psi(\bm{r},t)^*$ but can be transformed to a set of linear equations by using the Bogoliubov transformation:
+\begin{equation}
+\delta\psi(\bm{r},t)=\sum_k\left(u_k(\bm{r})e^{-\imath\omega_kt}
++v_k(\bm{r})^*e^{\imath\omega_k^*t}\right),
+\label{eqn:bogo}
+\end{equation}
+where $k$ is a label identifying the modes.
+Plugging the transformation~\eqref{eqn:bogo} into equation~\eqref{eqn:gpelin} one gets:
+\begin{subequations}
+\begin{eqnarray}
+\hbar\omega_ku_k(\bm{r})&=&\mathcal{L}u_k(\bm{r})+gN\phi_0(\bm{r})^2v_k(\bm{r}),\\
+-\hbar\omega_kv_k(\bm{r})&=&\mathcal{L}^*v_k(\bm{r})+gN\phi_0(\bm{r})^{*2}u_k(\bm{r}).
+\end{eqnarray}
+\end{subequations}
+This system is now linear and we must find the eigenvalues and eigenvectors of the operator: $\begin{pmatrix}
+\mathcal{L} & gN\abs{\psi_0(\bm{r})}^2\\
+-gN\abs{\psi_0(\bm{r})}^{*2} & -\mathcal{L}^*
+\end{pmatrix}$.
+It can be shown that the proper normalization for the eigenvectors is:
+\begin{equation}
+\int d\bm{r}\left(\abs{u_k(\bm{r})}^2-\abs{v_k(\bm{r})}^2\right)=1.
+\end{equation}
+
 \appendix
 \chapter{Getting more by using scripts}
+It is possible to override the configuration files values by assigning the parameters values directly from the command line interface.
+Indeed \qsimu accepts options of the form: \texttt{--label::symbol=...} where \texttt{label} is one of the label codewords of the configuration file and \texttt{symbol} is one of the parameters related to this codeword (see section~\ref{sec:codewords} for details).
+For example, it is possible to specify the number of grid points this way:
+\begin{verbatim}
+$ qsimu harmonic1D.cfg --grid::nx=128 --groundstate
+\end{verbatim}
+Note that \qsimu accepts options in any order.
 
+This possibility makes easier the creation of short scripts to study the same problem with small variations.
+
+\chapter{Finite temperature}
+System ground state in dimension $d$:
+\begin{subequations}
+\begin{eqnarray}
+\mu \phi_0(\bm{r})&=&\left(-\frac{\hbar^2}{2m}\Delta+V(\bm{r})+g\left(\abs{\phi_0(\bm{r})}^2+2n_0(\bm{r})\right)\right)\phi_0(\bm{r})\\
+n_0(\bm{r})&=&\int\frac{d^d\bm{p}}{h^d}
+\frac{1}{z(\bm{r})^{-1}\exp{\beta\frac{\bm{p}^2}{2m}}-1}
+=\frac{1}{\Lambda^d}g_{d/2}\left(z(\bm{r})\right)
+\end{eqnarray}
+\end{subequations}
+where: $z(\bm{r})=\exp{-\beta\left(V(\bm{r})+2g\left(\abs{\phi_0(\bm{r})}^2+n_0(\bm{r})\right)-\mu\right)}$ is the local equilibrium fugacity, $\Lambda=\sqrt{\frac{h^2\beta}{2\pi m}}$ is the thermal de Broglie wavelength and $g_s(z)=\sum_{n=1}^\infty\frac{z^n}{n^s}$ is the Polylogarithm function.
+
+Note that for dimension $d=2$ the Polylogarithm has the analytical form: $g_1(z)=-\ln{1-z}$.
 \end{document}
