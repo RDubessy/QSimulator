@@ -41,7 +41,7 @@ class GPE {
         /*!\brief Computes the Bogolyubov spectrum of the system. */
         virtual void spectrum(string &name, int m=0);
         /*!\brief Normalize the groundstate wave function. */
-        double normalize();
+        virtual double normalize();
         /*!\brief Computes the norm of a real vector. */
         virtual double norm(cvm::rvector &psi) const=0;
         /*!\brief Computes the norm of a complex vector. */
@@ -114,8 +114,7 @@ class GPE {
 class Polar1D : public GPE {
     public:
         /*!\brief Constructor. */
-        Polar1D(ConfigMap &config, Expression *H,
-                Expression *pot);
+        Polar1D(ConfigMap &config, Expression *H, Expression *pot);
         double norm(cvm::rvector &psi) const;
         double norm(cvm::cvector &psi) const;
         void plot(int nmode, std::string &name);
@@ -142,8 +141,7 @@ class Polar1D : public GPE {
 class GPE1D : public GPE {
     public:
         /*!\brief Constructor. */
-        GPE1D(ConfigMap &config, Expression *H,
-                Expression *pot);
+        GPE1D(ConfigMap &config, Expression *H, Expression *pot);
         double norm(cvm::rvector &psi) const;
         double norm(cvm::cvector &psi) const;
         void plot(int nmode, std::string &name);
@@ -168,8 +166,7 @@ class GPE1D : public GPE {
 class GPE2D : public GPE {
     public:
         /*!\brief Constructor. */
-        GPE2D(ConfigMap &config, Expression *H,
-                Expression *pot);
+        GPE2D(ConfigMap &config, Expression *H, Expression *pot);
         void spectrum(string &name, int m=0);
         double norm(cvm::rvector &psi) const;
         double norm(cvm::cvector &psi) const;
@@ -202,8 +199,7 @@ class GPE2D : public GPE {
 class GPE2DROT : public GPE2D {
     public:
         /*!\brief Constructor. */
-        GPE2DROT(ConfigMap &config, Expression *H,
-                Expression *pot);
+        GPE2DROT(ConfigMap &config, Expression *H, Expression *pot);
         void doStep(std::complex<double> dt);
         void computePhase(std::complex<double> dt);
         void initializeFFT();
@@ -225,8 +221,7 @@ class GPE2DROT : public GPE2D {
 class GPE3D : public GPE {
     public:
         /*!\brief Constructor. */
-        GPE3D(ConfigMap &config, Expression *H,
-                Expression *pot);
+        GPE3D(ConfigMap &config, Expression *H, Expression *pot);
         void spectrum(string &name, int m=0);
         double norm(cvm::rvector &psi) const;
         double norm(cvm::cvector &psi) const;
@@ -258,8 +253,7 @@ class GPE3D : public GPE {
 class GPE3DROT : public GPE3D {
     public:
         /*!\brief Constructor. */
-        GPE3DROT(ConfigMap &config, Expression *H,
-                Expression *pot);
+        GPE3DROT(ConfigMap &config, Expression *H, Expression *pot);
         void doStep(std::complex<double> dt);
         void computePhase(std::complex<double> dt);
         void initializeFFT();

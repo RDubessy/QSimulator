@@ -774,7 +774,6 @@ GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H,pot) {
     _ymax/=2;
     int n=_nx*_ny;
     _psi.resize(n);
-    _H0.resize(n);
     allocate(n);
 }
 /* }}} */
@@ -919,7 +918,6 @@ void GPE2D::initialize(Expression *pot) {
     vars["X"]=new Constant(0);
     vars["Y"]=new Constant(0);
     int n=_nx*_ny;
-    double *v=new double[n];
     double *psi=new double[n];
     for(int j=0;j<_ny;j++) {
         double y=j*_dy-_ymax;
@@ -930,13 +928,9 @@ void GPE2D::initialize(Expression *pot) {
             double vpot=*((double*)(pot->evaluate(vars)));
             vpot*=_vterm;
             _vpot[i+j*_nx]=vpot;
-            v[i+j*_nx]=vpot;
             psi[i+j*_nx]=vpot<1?sqrt(1-vpot):0;
         }
     }
-    //Assign H diagonal and initial state
-    _H0.diag(0).assign(v);
-    delete[] v;
     initializeFFT();
     _psi=cvm::cvector(psi,n);
     delete[] psi;
@@ -1140,7 +1134,6 @@ GPE3D::GPE3D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H,pot) {
     _zmax/=2;
     int n=_nx*_ny*_nz;
     _psi.resize(n);
-    _H0.resize(n);
     allocate(n);
 }
 /* }}} */
@@ -1280,7 +1273,6 @@ void GPE3D::initialize(Expression *pot) {
     vars["Y"]=new Constant(0);
     vars["Z"]=new Constant(0);
     int n=_nx*_ny*_nz;
-    double *v=new double[n];
     double *psi=new double[n];
     for(int k=0;k<_nz;k++) {
         double z=k*_dz-_zmax;
@@ -1294,14 +1286,10 @@ void GPE3D::initialize(Expression *pot) {
                 double vpot=*((double*)(pot->evaluate(vars)));
                 vpot*=_vterm;
                 _vpot[i+(j+k*_ny)*_nx]=vpot;
-                v[i+(j+k*_ny)*_nx]=vpot;
                 psi[i+(j+k*_ny)*_nx]=vpot<1?sqrt(1-vpot):0;
             }
         }
     }
-    //Assign H diagonal and initial state
-    _H0.diag(0).assign(v);
-    delete[] v;
     initializeFFT();
     _psi=cvm::cvector(psi,n);
     delete[] psi;
