@@ -8,10 +8,10 @@ LIB_DIR += /opt/lib
 LIBS += -lcvm_em64t -loptions -lmathexpr -lfftw3
 all : qsimu
 
-qsimu : gpe.o main.o 
+qsimu : thermal.o gpe.o main.o 
 	$(CC) $(CFLAGS) -I$(INC_DIR) -L$(LIB_DIR) $^ -o $@ $(LIBS) && mv $@ ../bin/
 
-gpe.o main.o : %.o : %.cpp
+thermal.o gpe.o main.o : %.o : %.cpp
 	$(CC) $(CFLAGS) -I$(INC_DIR) -c $<
 
 clean :

@@ -1,5 +1,5 @@
 /* This file is a part of QSimulator. {{{
- * Copyright (C) 2012 Romain Dubessy
+ * Copyright (C) 2013 Romain Dubessy
  *
  * QSimulator is free software: you can redistribute it and/or modify 
  * it under the terms of the GNU General Public License as published by 
@@ -21,6 +21,7 @@
 #include <fstream>      //For ofstream/ifstream...
 #include <common.h>     //For ConfigMap.
 #include <expression.h> //For Expression, VarDef.
+#include "thermal.h"    //For Thermal class.
 #include "gpe.h"        //For GPE class (and sub-classes).
 /* mainFunction method {{{ */
 int mainFunction(ConfigMap &config) {
@@ -46,23 +47,32 @@ int mainFunction(ConfigMap &config) {
     eqn=eqn->simplify(params);
     pot=pot->simplify(params);
     GPE *gpe=0;
-    if(pot->find("X")) {
-        if(pot->find("Y")) {
-            if(pot->find("Z")) {
-                if(eqn->find("LZ"))
-                    gpe=new GPE3DROT(config,eqn,pot);
-                else
-                    gpe=new GPE3D(config,eqn,pot);
-            } else {
-                if(eqn->find("LZ"))
-                    gpe=new GPE2DROT(config,eqn,pot);
-                else
-                    gpe=new GPE2D(config,eqn,pot);
+    if(config.find("thermal::N")!=config.end()) {
+        if(pot->find("X")) {
+            if(pot->find("Y")) {
+                gpe=new GPE2DThermal(config,eqn,pot,params);
             }
-        } else
-            gpe=new GPE1D(config,eqn,pot);
-    } else if(eqn->find("R"))
-        gpe=new Polar1D(config,eqn,pot);
+        } else if(pot->find("R"))
+            gpe=new Polar1DThermal(config,eqn,pot,params);
+    } else {
+        if(pot->find("X")) {
+            if(pot->find("Y")) {
+                if(pot->find("Z")) {
+                    if(eqn->find("LZ"))
+                        gpe=new GPE3DROT(config,eqn,pot);
+                    else
+                        gpe=new GPE3D(config,eqn,pot);
+                } else {
+                    if(eqn->find("LZ"))
+                        gpe=new GPE2DROT(config,eqn,pot);
+                    else
+                        gpe=new GPE2D(config,eqn,pot);
+                }
+            } else
+                gpe=new GPE1D(config,eqn,pot);
+        } else if(pot->find("R"))
+            gpe=new Polar1D(config,eqn,pot);
+    }
     if(gpe==0) {
         cerr << "[E] Unknown problem type!" << std::endl;
         return -1;
@@ -91,7 +101,7 @@ int mainFunction(ConfigMap &config) {
         double dt=getConfig(config,string("general::dt"),1e-3);
         double tol=getConfig(config,string("general::tol"),1e-12);
         double dttol=getConfig(config,string("general::dttol"),0.999);
-        gpe->findGroundState(dt,tol,dttol,log);
+        gpe->findGroundState(dt,tol,dttol,log,0);
         gpe->save(out);
     }
     if(config.find("spectrum")!=config.end()) {

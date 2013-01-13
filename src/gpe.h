@@ -1,4 +1,4 @@
-/* Copyright (C) 2012 Romain Dubessy */
+/* Copyright (C) 2013 Romain Dubessy */
 #ifndef GPE_H
 #define GPE_H
 #include <cvm.h>
@@ -37,11 +37,11 @@ class GPE {
         /*!\brief Constructor. */
         GPE(Expression *H, Expression *pot);
         /*!\brief Computes the groundstate wave function of the system. */
-        void findGroundState(double dttest, double tol, double dttol, string &name);
+        virtual void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
         /*!\brief Computes the Bogolyubov spectrum of the system. */
         virtual void spectrum(string &name, int m=0);
         /*!\brief Normalize the groundstate wave function. */
-        virtual double normalize();
+        double normalize();
         /*!\brief Computes the norm of a real vector. */
         virtual double norm(cvm::rvector &psi) const=0;
         /*!\brief Computes the norm of a complex vector. */
@@ -49,9 +49,9 @@ class GPE {
         /*!\brief Implements the --plot option through gnuplot. */
         virtual void plot(int nmode, std::string &name) =0;
         /*!\brief Save the groundstate wave function to a file. */
-        void save(std::string &name) const;
+        virtual void save(std::string &name) const;
         /*!\brief Load the groundstate wave function from a file. */
-        void load(std::string &name);
+        virtual void load(std::string &name);
         /*!\brief Write the header of an output file. */
         virtual void setHeader(std::ofstream &file) const=0;
         /*!\brief Get the header from an input file. */
@@ -123,12 +123,13 @@ class Polar1D : public GPE {
         void correct(cvm::srmatrix &H, int m);
         void doStep(std::complex<double> dt);
         void initialize(Expression *pot);
-    private:
+    protected:
         double _rmin;   //!<Minimum allowed radius.
-        double _rmax;   //!<Maximum allowed radius.
         double _dr;     //!<Grid step size.
-        int _l;         //!<Quantum number associated to the rotationnal invariance.
         int _n;         //!<Number of grid points.
+        int _l;         //!<Quantum number associated to the rotationnal invariance.
+    private:
+        double _rmax;   //!<Maximum allowed radius.
 };
 /* }}} */
 /* class GPE1D {{{ */
@@ -184,7 +185,6 @@ class GPE2D : public GPE {
         double _dy;     //!<Grid step size along Y
         int _nx;        //!<Number of grid points along X
         int _ny;        //!<Number of grid points along Y
-    private:
         double _xmax;   //!<Maximum value of X on the grid
         double _ymax;   //!<Maximum value of Y on the grid
 };
@@ -268,5 +268,31 @@ class GPE3DROT : public GPE3D {
         std::complex<double> *_phase2;//!<Correction to the kinetic energy contribution.
 };
 /* }}} */
+class GPE2DThermal : public GPE2D, public Thermal {
+    public:
+        /*!\brief Constructor. */
+        GPE2DThermal(ConfigMap &config, Expression *H, Expression *pot, VarDef &params);
+        void doStep(std::complex<double> dt);
+        void additionalStep();
+        std::string measure();
+        void setHeader(std::ofstream &file) const;
+        state getHeader(std::ifstream &file);
+        void plot(int nmode, std::string &name);
+        void save(std::string &name) const;
+        void load(std::string &name);
+};
+class Polar1DThermal : public Polar1D, public Thermal {
+    public:
+        Polar1DThermal(ConfigMap &config, Expression *H, Expression *pot, VarDef &params);
+        void doStep(std::complex<double> dt);
+        std::string measure();
+        void plot(int nmode, std::string &name);
+        void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
+        double thermalStep();
+        void save(std::string &name) const;
+        void load(std::string &name);
+        void setHeader(std::ofstream &file) const;
+        state getHeader(std::ifstream &file);
+};
 #endif //GPE_H
 /* gpe.h */

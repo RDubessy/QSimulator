@@ -128,7 +128,7 @@ x=a_xX,~t=\frac{T}{\omega_x}~\textrm{and}~\psi(x,t)=\frac{\Psi(X,T)}{\sqrt{a_x}}
 where $a_x=\sqrt{\frac{\hbar}{m\omega_x}}$ is the characteristic length of the harmonic oscillator.
 This results in:
 \begin{equation}
-\imath\frac{\partial}{\partial T}\Psi(X,T)=\left(-\frac{1}{2}\frac{\partial^2}{\partial x^2}+\frac{1}{2}X^2\right)\Psi(X,T).
+\imath\frac{\partial}{\partial T}\Psi(X,T)=\left(-\frac{1}{2}\frac{\partial^2}{\partial X^2}+\frac{1}{2}X^2\right)\Psi(X,T).
 \label{eqn:1dlho}
 \end{equation}
 Now the problem is well posed, and one can see that Eq.~\eqref{eqn:1dlho} has no free parameter: with the dimensional reduction we will be able to obtain results relevant for any (non zero) value of the trapping frequency!
@@ -491,4 +491,19 @@ n_0(\bm{r})&=&\int\frac{d^d\bm{p}}{h^d}
 where: $z(\bm{r})=\exp{-\beta\left(V(\bm{r})+2g\left(\abs{\phi_0(\bm{r})}^2+n_0(\bm{r})\right)-\mu\right)}$ is the local equilibrium fugacity, $\Lambda=\sqrt{\frac{h^2\beta}{2\pi m}}$ is the thermal de Broglie wavelength and $g_s(z)=\sum_{n=1}^\infty\frac{z^n}{n^s}$ is the Polylogarithm function.
 
 Note that for dimension $d=2$ the Polylogarithm has the analytical form: $g_1(z)=-\ln{1-z}$.
+
+Case of quasi 2D: strong harmonic confinement along $z$, harmonic along $\bm{r}_\perp$, ansatz $\phi_0(\bm{r})=\phi_0(\bm{r}_\perp)\phi_z(z)$ and $n_0(\bm{r})=n_0(\bm{r}_\perp)\abs{\phi_z(z)}^2$, where $\phi_z(z)=\frac{e^{-\frac{z^2}{2a_z^2}}}{\sqrt{a_z\sqrt{\pi}}}$, with $\int dz\abs{\phi_z(z)}^2=1$.
+Dimensionless variables: $\bm{r}_\perp=a_\perp\tilde{\bm{r}}_\perp$, $\tilde{\phi}_0(\tilde{\bm{r}}_\perp)=a_\perp\phi_0(\bm{r}_\perp)$, $\tilde{n}_0(\tilde{\bm{r}}_\perp)=a_\perp^2n_0(\bm{r}_\perp)$.
+\begin{eqnarray*}
+\tilde{\mu}_\perp\tilde{\phi}_0(\tilde{\bm{r}}_\perp)
+&=&\left(-\frac{1}{2}\Delta_\perp
++\frac{1}{2}(\tilde{x}^2+\tilde{y}^2)
++\tilde{g}
+\left(\abs{\tilde{\phi}_0(\tilde{\bm{r}}_\perp)}^2+2\tilde{n}_0(\tilde{\bm{r}}_\perp)\right)\right)
+\tilde{\phi}_0(\tilde{\bm{r}}_\perp)\\
+n_0(\bm{r}_\perp)&=&-\frac{1}{\tilde{\Lambda}^2}\ln{1-z(\tilde{\bm{r}}_\perp)}\\
+z(\bm{r}_\perp)&=&\exp{-\tilde{\beta}\left(\frac{\tilde{x}^2+\tilde{y}^2}{2}+2\tilde{g}\left(\abs{\tilde{\phi}_0(\tilde{\bm{r}}_\perp)}^2
++\tilde{n}_0(\tilde{\bm{r}}_\perp)\right)-\tilde{\mu}_\perp\right)}
+\end{eqnarray*}
+where $\tilde{\mu}_\perp=\frac{\mu-\frac{\hbar\omega_z}{2}}{\hbar\omega_\perp}$, $\tilde{g}=\sqrt{8\pi}\frac{a}{a_z}$, $\tilde{\beta}=\beta\hbar\omega_\perp$, $\tilde{\Lambda}=\sqrt{2\pi\tilde{\beta}}$, and $a_\perp=\sqrt{\frac{\hbar}{m\omega_\perp}}$.
 \end{document}

@@ -1,5 +1,5 @@
 /* This file is a part of QSimulator. {{{
- * Copyright (C) 2012 Romain Dubessy
+ * Copyright (C) 2013 Romain Dubessy
  *
  * QSimulator is free software: you can redistribute it and/or modify 
  * it under the terms of the GNU General Public License as published by 
@@ -19,6 +19,7 @@
 #include <expression.h>
 #include <fstream>
 #include <iomanip>
+#include "thermal.h"
 #include "gpe.h"
 Constant zero(0);
 Constant one(1);
@@ -64,6 +65,7 @@ GPE::GPE(Expression *H, Expression *pot) {
     _psip=0;
     _phase=0;
     _vpot=0;
+    _mu=0;
 }
 /* }}} */
 /* findGroundState method {{{ */
@@ -95,7 +97,7 @@ GPE::GPE(Expression *H, Expression *pot) {
  * \param dttol the relative target accuracy on the fonction norm.
  * \param name a string containing the name of a log file.
  */
-void GPE::findGroundState(double dttest, double tol, double dttol, string &name) {
+void GPE::findGroundState(double dttest, double tol, double dttol, string &name, int verb) {
     std::cerr << "[I] Find groundstate method..." << std::endl;
     int c=0;
     int p=1;
@@ -111,7 +113,8 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name)
     //Initialize the phase for fft
     computePhase(std::complex<double>(-dt,0));
     while(ttol>tol) {
-        std::cerr << "[I]\tpass #" << p << " objective: " << ttol;
+        if(verb>0)
+            std::cerr << "[I]\tpass #" << p << " objective: " << ttol;
         std::cerr.flush();
         while(eps>ttol) {
             doStep(std::complex<double>(-dt,0));
@@ -121,7 +124,7 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name)
                 //Update the phase
                 computePhase(std::complex<double>(-dt,0));
             } else {
-                double deltamu=-log(tmp)/dt;
+                double deltamu=-std::log(tmp)/dt;
                 _mu+=deltamu;
                 eps=std::abs(deltamu/_mu);
             }
@@ -129,7 +132,8 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name)
             if(logout && c%100==0)
                 file << c << ' ' << tmp << ' ' << dt << ' ' << _mu << ' ' << eps << '\n';
         }
-        std::cerr << ", done: " << eps << ", mu=" << _mu << std::endl;
+        if(verb>0)
+            std::cerr << ", done: " << eps << ", mu=" << _mu << std::endl;
         ttol/=10;
         p++;
         dt=dttest;
@@ -521,7 +525,7 @@ void Polar1D::doStep(std::complex<double> dt) {
     _psi.imag()=_H0*psi.imag();
     //Computes the interaction term
     for(int i=0;i<n;i++)
-        _v[i]+=std::norm(v[i])*v[i]*_gN;
+        _v[i]+=(_gN*std::norm(v[i])-_mu)*v[i];
     _psi*=dt;
     _psi+=psi;
 }
@@ -970,7 +974,7 @@ void GPE2D::imprint(int l) {
         for(int i=0;i<_nx;i++) {
             double x=i-xo;
             double phase=-atan2(y,-x)+2*pi;
-            psi[i+j*_nx]*=exp(std::complex<double>(0,l*phase));
+            psi[i+j*_nx]*=std::exp(std::complex<double>(0,l*phase));
         }
     }
 }
@@ -1036,8 +1040,8 @@ void GPE2DROT::computePhase(std::complex<double> dt) {
             double x=i-xo;
             double kx=2*pi/(_dx*_nx)*(i<_nx/2?i:i-_nx);
             double k2x=-kx*kx;
-            _phase[i+j*_nx]=scale*exp(dt*(_kterm*k2x-_oterm*y*kx));
-            _phase2[i+j*_nx]=exp(dt*(_kterm*k2y+_oterm*x*ky));
+            _phase[i+j*_nx]=scale*std::exp(dt*(_kterm*k2x-_oterm*y*kx));
+            _phase2[i+j*_nx]=std::exp(dt*(_kterm*k2y+_oterm*x*ky));
         }
     }
     return;
@@ -1259,7 +1263,7 @@ void GPE3D::computePhase(std::complex<double> dt) {
                 double kx=2*pi/(_dx*_nx)*(i<_nx/2?i:i-_nx);
                 double k2x=kx*kx;
                 double k2=-(k2x+k2y+k2z);
-                _phase[i+(j+k*_ny)*_nx]=scale*exp(dt*_kterm*k2);
+                _phase[i+(j+k*_ny)*_nx]=scale*std::exp(dt*_kterm*k2);
             }
         }
     }
@@ -1386,8 +1390,8 @@ void GPE3DROT::computePhase(std::complex<double> dt) {
                 double x=i-xo;
                 double kx=2*pi/(_dx*_nx)*(i<_nx/2?i:i-_nx);
                 double k2x=-kx*kx;
-                _phase[i+(j+k*_ny)*_nx]=scale*exp(dt*(_kterm*(k2x+k2z)-_oterm*y*kx));
-                _phase2[i+(j+k*_ny)*_nx]=exp(dt*(_kterm*k2y+_oterm*x*ky));
+                _phase[i+(j+k*_ny)*_nx]=scale*std::exp(dt*(_kterm*(k2x+k2z)-_oterm*y*kx));
+                _phase2[i+(j+k*_ny)*_nx]=std::exp(dt*(_kterm*k2y+_oterm*x*ky));
             }
         }
     }
@@ -1468,6 +1472,380 @@ std::string GPE3DROT::measure() {
     mes << ' ' << _oterm << ' ' << lz;
     std::string res=mes.str();
     return res;
+}
+/* }}} */
+/* }}} */
+/* class GPE2DThermal implementation {{{ */
+/* Constructor {{{ */
+GPE2DThermal::GPE2DThermal(ConfigMap &config, Expression *H, Expression *pot,VarDef &params) : GPE2D(config,H,pot), Thermal(config,params) {
+    int n=_psi.size();
+    _n0=new double[n];
+    memset(_n0,0,n*sizeof(double));
+}
+/* }}} */
+/* doStep method {{{ */
+void GPE2DThermal::doStep(std::complex<double> dt) {
+    int n=_psi.size();
+    std::complex<double> *v=_psi.get();
+    for(int i=0;i<n;i++)
+        v[i]*=std::exp(dt*(_vpot[i]+_gN*(_Nbec*std::norm(v[i])+2*_n0[i])-_mu));
+    fftw_execute(_planFFT);
+    for(int i=0;i<n;i++)
+        _psip[i]*=_phase[i];
+    fftw_execute(_planIFFT);
+}
+/* }}} */
+void GPE2DThermal::additionalStep() {
+    int n=_psi.size();
+    std::complex<double> *v=_psi.get();
+    double nold,eps;
+    do {
+        double nth=0;
+        for(int i=0;i<n;i++) {
+            double z=std::exp(-_beta*(_vpot[i]+2*_gN*(_Nbec*std::norm(v[i])+_n0[i])-_mu));
+            if(z>=1) z=0.9;
+            _n0[i]=-std::log(1-z)/(_lambda*_lambda);
+            nth+=_n0[i];
+        }
+        nth*=_dx*_dy;
+        nold=_Ntherm;
+        if(nth>_Ntot) {
+            _Ntherm=_Ntot;
+            double scale=_Ntot/nth;
+            for(int i=0;i<n;i++)
+                _n0[i]*=scale;
+        } else {
+            _Ntherm=nth;
+        }
+        _Nbec=_Ntot-_Ntherm;
+        eps=std::abs(nold-_Ntherm)/nold;
+    } while(eps>0.1);
+    std::cerr << " [" << _Nbec << "/" << _Ntherm << "]";
+}
+/* measure method {{{ */
+std::string GPE2DThermal::measure() {
+    std::ostringstream mes;
+    mes.precision(15);
+    mes << _mu << ' ' << epot() << ' ' << ekin() << ' ' << _Nbec << ' ' << _Ntherm;
+    std::string res=mes.str();
+    return res;
+}
+/* }}} */
+/* setHeader method {{{ */
+void GPE2DThermal::setHeader(std::ofstream &file) const {
+    const char *type="T2D";
+    file.write((const char*)type,3*sizeof(char));
+    file.write((const char*)&_nx,sizeof(int));
+    file.write((const char*)&_ny,sizeof(int));
+    file.write((const char*)&_xmax,sizeof(double));
+    file.write((const char*)&_ymax,sizeof(double));
+    file.write((const char*)&_dx,sizeof(double));
+    file.write((const char*)&_dy,sizeof(double));
+    file.write((const char*)&_mu,sizeof(double));
+    file.write((const char*)&_Nbec,sizeof(double));
+    file.write((const char*)&_Ntherm,sizeof(double));
+}
+/* }}} */
+/* getHeader method {{{ */
+state GPE2DThermal::getHeader(std::ifstream &file) {
+    char type[3];
+    file.read((char*)type,3*sizeof(char));
+    if(type[0]=='T' && type[1]=='2' && type[2]=='D') {
+        double mu,dx,xmax,dy,ymax,Nbec,Ntherm;
+        int nx,ny;
+        file.read((char*)&nx,sizeof(int));
+        file.read((char*)&ny,sizeof(int));
+        file.read((char*)&xmax,sizeof(double));
+        file.read((char*)&ymax,sizeof(double));
+        file.read((char*)&dx,sizeof(double));
+        file.read((char*)&dy,sizeof(double));
+        file.read((char*)&mu,sizeof(double));
+        file.read((char*)&Nbec,sizeof(double));
+        file.read((char*)&Ntherm,sizeof(double));
+        _mu=mu;
+        _Nbec=Nbec;
+        _Ntherm=Ntherm;
+        if(nx!=_nx || ny!=_ny) {
+            std::cerr << "[E] Incompatible size !" << std::endl;
+            return error;
+        }
+    } else {
+        std::cerr << "[E] Incompatible type !" << std::endl;
+        return error;
+    }
+    return ok;
+}
+/* }}} */
+/* plot method {{{ */
+void GPE2DThermal::plot(int nmode, std::string &name) {
+    std::ofstream file("/tmp/psi.txt");
+    if(file.is_open()) {
+        const std::complex<double> *psi=_psi.get();
+        for(int j=0;j<_ny;j++) {
+            for(int i=0;i<_nx;i++) {
+                file << i*_dx-_xmax << ' ' << j*_dy-_ymax << ' '
+                    << psi[i+j*_nx].real() << ' ' << psi[i+j*_nx].imag()
+                    << ' ' << _n0[i+j*_nx]
+                    << '\n';
+            }
+            file << '\n';
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file \"/tmp/psi.txt\" !" << std::endl;
+    }
+    std::cout << "set view map;unset surface;set pm3d;unset key;"
+        << "set size square;set size 1,1;set origin 0,0;"
+        << "set multiplot layout 1,2;"
+        << "splot \"/tmp/psi.txt\" using 1:2:($3*$3+$4*$4);"
+        << "splot \"/tmp/psi.txt\" using 1:2:5;"
+        << "unset multiplot;"
+        << "pause mouse\n";
+    std::cout.flush();
+    return;
+}
+/* }}} */
+/* save method {{{ */
+void GPE2DThermal::save(std::string &name) const {
+    std::ofstream file(name.c_str(),std::ofstream::binary);
+    if(file.is_open()) {
+        setHeader(file);
+        const std::complex<double> *v=_psi.get();
+        int n=_psi.size();
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(v[i].real()),sizeof(double));
+        }
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(v[i].imag()),sizeof(double));
+        }
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(_n0[i]),sizeof(double));
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file:" << name << std::endl;
+    }
+    return;
+}
+/* }}} */
+/* load method {{{ */
+void GPE2DThermal::load(std::string &name) {
+    std::ifstream file(name.c_str(),std::ifstream::binary);
+    if(file.is_open()) {
+        switch(getHeader(file)) {
+            case ok:
+                {
+                    std::complex<double> *v=_psi.get();
+                    int n=_psi.size();
+                    std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << n << ")" << std::endl;
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(v[i].real()),sizeof(double));
+                    }
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(v[i].imag()),sizeof(double));
+                    }
+                    std::cerr << "[I] Loading thermal part [" << _Nbec << "/" << _Ntherm << "]" << std::endl;
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(_n0[i]),sizeof(double));
+                    }
+                }
+            case error:
+            case converted:
+            default:
+                file.close();
+        }
+    } else {
+        std::cerr << "[E] Can't open file:" << name << std::endl;
+    }
+    return;
+}
+/* }}} */
+/* }}} */
+/* class Polar1DThermal implementation {{{ */
+/* Constructor {{{ */
+Polar1DThermal::Polar1DThermal(ConfigMap &config, Expression *H, Expression *pot, VarDef &params) : Polar1D(config,H,pot), Thermal(config,params) {
+    int n=_psi.size();
+    _n0=new double[n];
+    memset(_n0,0,n*sizeof(double));
+}
+/* }}} */
+/* doStep method {{{ */
+void Polar1DThermal::doStep(std::complex<double> dt) {
+    int n=_psi.size();
+    cvm::cvector psi(n);
+    std::complex<double> *v=psi.get();
+    std::complex <double> *_v=_psi.get();
+    psi=_psi;
+    _psi.real()=_H0*psi.real();
+    _psi.imag()=_H0*psi.imag();
+    //Computes the interaction term
+    for(int i=0;i<n;i++)
+        _v[i]+=(_gN*(_Nbec*std::norm(v[i])+2*_n0[i])-_mu)*v[i];
+    _psi*=dt;
+    _psi+=psi;
+}
+/* }}} */
+/* measure method {{{ */
+std::string Polar1DThermal::measure() {
+    std::ostringstream mes;
+    mes.precision(15);
+    mes << _mu << ' ' << epot() << ' ' << ekin() << ' ' << _Nbec << ' ' << _Ntherm;
+    std::string res=mes.str();
+    return res;
+}
+/* }}} */
+/* plot method {{{ */
+void Polar1DThermal::plot(int nmodes, std::string &name) {
+    std::ofstream file("/tmp/psi.txt");
+    if(file.is_open()) {
+        const std::complex<double> *psi=_psi.get();
+        for(int i=0;i<_n;i++) {
+            file << _rmin+i*_dr << ' ' << psi[i].real() << ' ' << psi[i].imag() << ' ' << _n0[i] << '\n';
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file \"/tmp/psi.txt\" !" << std::endl;
+    }
+    std::cout << "set style data lines;"
+        << "set xlabel \"r\";set ylabel \"Density\";"
+        << "plot \"/tmp/psi.txt\" using 1:(($2*$2+$3*$3)*" << _Nbec << ") title \"\""
+        << ",\"\" using 1:4 title \"\"";
+    std::cout << ";pause mouse\n";
+    std::cout.flush();
+    return;
+}
+/* }}} */
+double Polar1DThermal::thermalStep() {
+    int n=_psi.size();
+    std::complex<double> *v=_psi.get();
+    double nth=0;
+    double rmin=_rmin/_dr;
+    for(int i=0;i<n;i++) {
+        double z=std::exp(-_beta*(_vpot[i]+2*_gN*(_Nbec*std::norm(v[i])+_n0[i])-_mu));
+        if(z<1)
+            _n0[i]=-std::log(1.0-z)/(_lambda*_lambda);
+        nth+=(rmin+i)*_n0[i];
+    }
+    nth*=2*pi*_dr*_dr;
+    return nth;
+}
+void Polar1DThermal::findGroundState(double dttest, double tol, double dttol, string &name, int verb) {
+    double nold,eps;
+    int n=_psi.size();
+    do {
+        nold=_Ntherm;
+        double ntmp,rel,mutmp,murel;
+        do {
+            ntmp=_Ntherm;
+            mutmp=_mu;
+            GPE::findGroundState(dttest,tol,dttol,name,verb);
+            _Ntherm=thermalStep();
+            rel=std::abs((ntmp-_Ntherm)/_Ntherm);
+            murel=std::abs((mutmp-_mu)/_mu);
+        } while(rel>1e-3 || murel>1e-7);
+        double ntot=_Nbec+_Ntherm;
+        double scale=_Ntot/ntot;
+        _Nbec*=scale;
+        _Ntherm*=scale;
+        for(int i=0;i<n;i++)
+            _n0[i]*=scale;
+        std::cerr << "[I] Thermal step: [" << _Nbec << "/" << _Ntherm << "] " << std::endl;
+        eps=std::abs(nold-_Ntherm);
+    } while(eps>1);
+}
+/* setHeader method {{{ */
+void Polar1DThermal::setHeader(std::ofstream &file) const {
+    const char *type="P1T";
+    file.write((const char*)type,3*sizeof(char));
+    file.write((const char*)&_n,sizeof(int));
+    file.write((const char*)&_rmin,sizeof(double));
+    file.write((const char*)&_dr,sizeof(double));
+    file.write((char*)&_l,sizeof(int));
+    file.write((const char*)&_mu,sizeof(double));
+    file.write((const char*)&_Nbec,sizeof(double));
+    file.write((const char*)&_Ntherm,sizeof(double));
+}
+/* }}} */
+/* getHeader method {{{ */
+state Polar1DThermal::getHeader(std::ifstream &file) {
+    char type[3];
+    double mu,dr,rmin,Nbec,Ntherm;
+    int n,l;
+    file.read((char*)type,3*sizeof(char));
+    if(type[0]!='P' || type[1]!='1' || type[2]!='T') {
+        std::cerr << "[E] Incompatible type !" << std::endl;
+        return error;
+    }
+    file.read((char*)&n,sizeof(int));
+    file.read((char*)&rmin,sizeof(double));
+    file.read((char*)&dr,sizeof(double));
+    file.read((char*)&l,sizeof(int));
+    file.read((char*)&mu,sizeof(double));
+    file.read((char*)&Nbec,sizeof(double));
+    file.read((char*)&Ntherm,sizeof(double));
+    _mu=mu;
+    _Nbec=Nbec;
+    _Ntherm=Ntherm;
+    if(n!=_n) {
+        std::cerr << "[E] Incompatible size !" << std::endl;
+        return error;
+    }
+    return ok;
+}
+/* }}} */
+/* save method {{{ */
+void Polar1DThermal::save(std::string &name) const {
+    std::ofstream file(name.c_str(),std::ofstream::binary);
+    if(file.is_open()) {
+        setHeader(file);
+        const std::complex<double> *v=_psi.get();
+        int n=_psi.size();
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(v[i].real()),sizeof(double));
+        }
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(v[i].imag()),sizeof(double));
+        }
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(_n0[i]),sizeof(double));
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file:" << name << std::endl;
+    }
+    return;
+}
+/* }}} */
+/* load method {{{ */
+void Polar1DThermal::load(std::string &name) {
+    std::ifstream file(name.c_str(),std::ifstream::binary);
+    if(file.is_open()) {
+        switch(getHeader(file)) {
+            case ok:
+                {
+                    std::complex<double> *v=_psi.get();
+                    int n=_psi.size();
+                    std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << n << ")" << std::endl;
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(v[i].real()),sizeof(double));
+                    }
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(v[i].imag()),sizeof(double));
+                    }
+                    std::cerr << "[I] Loading thermal part [" << _Nbec << "/" << _Ntherm << "]" << std::endl;
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(_n0[i]),sizeof(double));
+                    }
+                }
+            case error:
+            case converted:
+            default:
+                file.close();
+        }
+    } else {
+        std::cerr << "[E] Can't open file:" << name << std::endl;
+    }
+    return;
 }
 /* }}} */
 /* }}} */
