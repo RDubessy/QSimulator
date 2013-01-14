@@ -97,11 +97,16 @@ int mainFunction(ConfigMap &config) {
         std::cerr << "[I] Imprinting a l=" << l << " circulation" << endl;
         gpe->imprint(l);
     }
+    int verbose=0;
+    if(config.find("verb")!=config.end()) {
+        std::cerr << "[I] Verbose output" << std::endl;
+        verbose=1;
+    }
     if(config.find("groundstate")!=config.end()) {
         double dt=getConfig(config,string("general::dt"),1e-3);
         double tol=getConfig(config,string("general::tol"),1e-12);
         double dttol=getConfig(config,string("general::dttol"),0.999);
-        gpe->findGroundState(dt,tol,dttol,log,0);
+        gpe->findGroundState(dt,tol,dttol,log,verbose);
         gpe->save(out);
     }
     if(config.find("spectrum")!=config.end()) {

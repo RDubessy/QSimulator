@@ -525,9 +525,60 @@ void Polar1D::doStep(std::complex<double> dt) {
     _psi.imag()=_H0*psi.imag();
     //Computes the interaction term
     for(int i=0;i<n;i++)
-        _v[i]+=(_gN*std::norm(v[i])-_mu)*v[i];
+        _v[i]+=_gN*std::norm(v[i])*v[i];
     _psi*=dt;
     _psi+=psi;
+}
+/* }}} */
+/* findGroundState method {{{ */
+void Polar1D::findGroundState(double dttest, double tol, double dttol, string &name, int verb) {
+    std::cerr << "[I] Find groundstate method..." << std::endl;
+    int c=0;
+    int p=1;
+    double dt=dttest;
+    double eps=1.0;
+    double ttol=0.01;
+    std::ofstream file(name.c_str());
+    bool logout=file.is_open();
+    if(!logout && name.size()>0) {
+        cerr << "[W] Cannot open logging file: " << name << std::endl;
+    }
+    _mu=0;
+    double muOld=0;
+    //Initialize the phase for fft
+    computePhase(std::complex<double>(-dt,0));
+    while(ttol>tol) {
+        if(verb>0)
+            std::cerr << "[I]\tpass #" << p << " objective: " << ttol;
+        std::cerr.flush();
+        while(eps>ttol) {
+            doStep(std::complex<double>(-dt,0));
+            double tmp=normalize();
+            if(tmp<dttol) {        //Choose dt.
+                dt/=2;
+                //Update the phase
+                computePhase(std::complex<double>(-dt,0));
+            } else {
+                _mu=-std::log(tmp)/dt;
+                eps=std::abs((muOld-_mu)/_mu);
+                muOld=_mu;
+            }
+            c++;
+            if(logout && c%100==0)
+                file << c << ' ' << tmp << ' ' << dt << ' ' << _mu << ' ' << eps << '\n';
+        }
+        if(verb>0)
+            std::cerr << ", done: " << eps << ", mu=" << _mu << std::endl;
+        ttol/=10;
+        p++;
+        dt=dttest;
+        //Update the phase
+        computePhase(std::complex<double>(-dt,0));
+    }
+    if(logout)
+        file.close();
+    std::cerr << "[I] After "<< c << " iterations, mu=" << _mu << " [" << eps << "]." << std::endl;
+    return;
 }
 /* }}} */
 /* initialize method {{{ */
@@ -1680,7 +1731,7 @@ void Polar1DThermal::doStep(std::complex<double> dt) {
     _psi.imag()=_H0*psi.imag();
     //Computes the interaction term
     for(int i=0;i<n;i++)
-        _v[i]+=(_gN*(_Nbec*std::norm(v[i])+2*_n0[i])-_mu)*v[i];
+        _v[i]+=_gN*(_Nbec*std::norm(v[i])+2*_n0[i])*v[i];
     _psi*=dt;
     _psi+=psi;
 }
@@ -1718,12 +1769,15 @@ void Polar1DThermal::plot(int nmodes, std::string &name) {
 double Polar1DThermal::thermalStep() {
     int n=_psi.size();
     std::complex<double> *v=_psi.get();
-    double nth=0;
-    double rmin=_rmin/_dr;
     for(int i=0;i<n;i++) {
         double z=std::exp(-_beta*(_vpot[i]+2*_gN*(_Nbec*std::norm(v[i])+_n0[i])-_mu));
         if(z<1)
             _n0[i]=-std::log(1.0-z)/(_lambda*_lambda);
+    }
+    double rmin=_rmin/_dr;
+    double nth=rmin*_n0[0]+(rmin+n-1)*_n0[n-1];
+    for(int i=1;i<n-1;i++) {
+        _n0[i]=(_n0[i]+_n0[i-1])/2;
         nth+=(rmin+i)*_n0[i];
     }
     nth*=2*pi*_dr*_dr;
@@ -1738,7 +1792,7 @@ void Polar1DThermal::findGroundState(double dttest, double tol, double dttol, st
         do {
             ntmp=_Ntherm;
             mutmp=_mu;
-            GPE::findGroundState(dttest,tol,dttol,name,verb);
+            Polar1D::findGroundState(dttest,tol,dttol,name,verb);
             _Ntherm=thermalStep();
             rel=std::abs((ntmp-_Ntherm)/_Ntherm);
             murel=std::abs((mutmp-_mu)/_mu);

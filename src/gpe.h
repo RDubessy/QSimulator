@@ -122,6 +122,7 @@ class Polar1D : public GPE {
         state getHeader(std::ifstream &file);
         void correct(cvm::srmatrix &H, int m);
         void doStep(std::complex<double> dt);
+        void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
         void initialize(Expression *pot);
     protected:
         double _rmin;   //!<Minimum allowed radius.
