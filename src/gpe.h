@@ -274,13 +274,14 @@ class GPE2DThermal : public GPE2D, public Thermal {
         /*!\brief Constructor. */
         GPE2DThermal(ConfigMap &config, Expression *H, Expression *pot, VarDef &params);
         void doStep(std::complex<double> dt);
-        void additionalStep();
         std::string measure();
-        void setHeader(std::ofstream &file) const;
-        state getHeader(std::ifstream &file);
         void plot(int nmode, std::string &name);
+        void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
+        double thermalStep();
         void save(std::string &name) const;
         void load(std::string &name);
+        void setHeader(std::ofstream &file) const;
+        state getHeader(std::ifstream &file);
 };
 class Polar1DThermal : public Polar1D, public Thermal {
     public:

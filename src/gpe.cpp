@@ -1546,33 +1546,49 @@ void GPE2DThermal::doStep(std::complex<double> dt) {
     fftw_execute(_planIFFT);
 }
 /* }}} */
-void GPE2DThermal::additionalStep() {
+/* thermalStep method {{{ */
+double GPE2DThermal::thermalStep() {
     int n=_psi.size();
     std::complex<double> *v=_psi.get();
-    double nold,eps;
-    do {
-        double nth=0;
-        for(int i=0;i<n;i++) {
-            double z=std::exp(-_beta*(_vpot[i]+2*_gN*(_Nbec*std::norm(v[i])+_n0[i])-_mu));
-            if(z>=1) z=0.9;
-            _n0[i]=-std::log(1-z)/(_lambda*_lambda);
-            nth+=_n0[i];
-        }
-        nth*=_dx*_dy;
-        nold=_Ntherm;
-        if(nth>_Ntot) {
-            _Ntherm=_Ntot;
-            double scale=_Ntot/nth;
-            for(int i=0;i<n;i++)
-                _n0[i]*=scale;
-        } else {
-            _Ntherm=nth;
-        }
-        _Nbec=_Ntot-_Ntherm;
-        eps=std::abs(nold-_Ntherm)/nold;
-    } while(eps>0.1);
-    std::cerr << " [" << _Nbec << "/" << _Ntherm << "]";
+    for(int i=0;i<n;i++) {
+        double z=std::exp(-_beta*(_vpot[i]+2*_gN*(_Nbec*std::norm(v[i])+_n0[i])-_mu));
+        if(z<1)
+            _n0[i]=-std::log(1.0-z)/(_lambda*_lambda);
+    }
+    double nth=0;
+    for(int i=0;i<n;i++) {
+        nth+=_n0[i];
+    }
+    nth*=_dx*_dy;
+    return nth;
 }
+/* }}} */
+/* findGroundState method {{{ */
+void GPE2DThermal::findGroundState(double dttest, double tol, double dttol, string &name, int verb) {
+    double nold,eps;
+    int n=_psi.size();
+    do {
+        nold=_Ntherm;
+        double ntmp,rel,mutmp,murel;
+        do {
+            ntmp=_Ntherm;
+            mutmp=_mu;
+            GPE::findGroundState(dttest,tol,dttol,name,verb);
+            _Ntherm=thermalStep();
+            rel=std::abs((ntmp-_Ntherm)/_Ntherm);
+            murel=std::abs((mutmp-_mu)/_mu);
+        } while(rel>1e-3 || murel>1e-7);
+        double ntot=_Nbec+_Ntherm;
+        double scale=_Ntot/ntot;
+        _Nbec*=scale;
+        _Ntherm*=scale;
+        for(int i=0;i<n;i++)
+            _n0[i]*=scale;
+        std::cerr << "[I] Thermal step: [" << _Nbec << "/" << _Ntherm << "] " << std::endl;
+        eps=std::abs(nold-_Ntherm);
+    } while(eps>1);
+}
+/* }}} */
 /* measure method {{{ */
 std::string GPE2DThermal::measure() {
     std::ostringstream mes;
@@ -1766,6 +1782,7 @@ void Polar1DThermal::plot(int nmodes, std::string &name) {
     return;
 }
 /* }}} */
+/* thermalStep method {{{ */
 double Polar1DThermal::thermalStep() {
     int n=_psi.size();
     std::complex<double> *v=_psi.get();
@@ -1783,6 +1800,8 @@ double Polar1DThermal::thermalStep() {
     nth*=2*pi*_dr*_dr;
     return nth;
 }
+/* }}} */
+/* findGroundState method {{{ */
 void Polar1DThermal::findGroundState(double dttest, double tol, double dttol, string &name, int verb) {
     double nold,eps;
     int n=_psi.size();
@@ -1807,6 +1826,7 @@ void Polar1DThermal::findGroundState(double dttest, double tol, double dttol, st
         eps=std::abs(nold-_Ntherm);
     } while(eps>1);
 }
+/* }}} */
 /* setHeader method {{{ */
 void Polar1DThermal::setHeader(std::ofstream &file) const {
     const char *type="P1T";
