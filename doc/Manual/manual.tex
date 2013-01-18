@@ -14,7 +14,7 @@
 \title{Quantum Simulator -- Reference Manual}
 
 \newcommand{\abs}[1]{\left|#1\right|}
-\newcommand{\qsimu}{\texttt{qsimu}\,}
+\newcommand{\qsimu}{\texttt{qsimu}{} }
 \newcommand{\fft}[1]{\mathcal{F}\left[#1\right]}
 \newcommand{\ket}[1]{\left|#1\right>}
 \newcommand{\mean}[1]{\left<#1\right>}
@@ -27,6 +27,8 @@
 \begin{abstract}
 This document is the user's manual of the \qsimu code.
 See section~\ref{sec:doc} to generate the programming reference, relative to the source code.
+
+The \qsimu code aims at providing an intuitive interface for solving the non linear Schrödinger equation with a special emphasis on the bi-dimensional case.
 \end{abstract}
 \begin{table}
 \begin{center}
@@ -45,13 +47,13 @@ $\hbar=\frac{h}{2\pi}$ & Reduced Planck constant\\
 \cleardoublepage
 \tableofcontents
 \chapter{Introduction}
-This program is designed to study the non linear Schrodinger equation (NLSE), also called Gross-Pitaevskii equation (GPE) in the cold atom community:
+This program is designed to study the non linear Schrödinger equation (NLSE), also called Gross-Pitaevskii equation (GPE) in the cold atom community:
 \begin{equation}
 \imath\hbar\frac{\partial}{\partial t}\psi(\bm{r},t)=\left(-\frac{\hbar^2}{2m}\Delta+V(\bm{r},t)+gN\abs{\psi(t,\bm{r})}^2\right)\psi(\bm{r},t),
 \label{eqn:gpe}
 \end{equation}
 white the proper normalisation $\int \bm{dr}\abs{\psi(t,\bm{r})}^2=1$.
-Instead of trying to solve Eq.~\eqref{eqn:gpe} with stable algorithms that preserves the wave function normalization, which is not an obvious problem, we will make use of the formal solution of Eq.~\eqref{eqn:gpe} in term of the evolution operator:
+Instead of trying to solve equation~\eqref{eqn:gpe} with stable algorithms that preserves the wave function normalization, which is not an obvious problem, we will make use of the formal solution of equation~\eqref{eqn:gpe} in term of the evolution operator:
 \begin{subequations}
 \begin{eqnarray}
 \psi(\bm{r},t)&=&U(t,t_0)\psi(\bm{r},t_0),\\
@@ -74,8 +76,8 @@ The rest of the installation procedure depends on your operating system.
 \subsection{Dependencies}
 For convenience \qsimu uses dynamically linked external library that provides useful functionalities with optimized code:
 \begin{itemize}
-\item \texttt{fftw3} a fast Fourier transform library, available at \url{http://www.fftw3.org},
-\item \texttt{cvmlib} a \texttt{C++} interface to the famous fortran based linear algebra packages \texttt{blas} and \texttt{lapack}, available at \url{http://www.cvmlib.org},
+\item \texttt{fftw3} a fast Fourier transform library, available at \url{http://www.fftw.org},
+\item \texttt{cvmlib} a \texttt{C++} interface to the famous Fortran based linear algebra packages \texttt{blas} and \texttt{lapack}, available at \url{http://www.cvmlib.org},
 \item two miscellaneous libraries for the interface with command line options and configuration file, available at \url{http://github.com/RDubessy/MyLibraries},
 \end{itemize}
 \qsimu assumes that the library files are located in the \texttt{/opt/lib} directory with the corresponding header files in \texttt{/opt/include}.
@@ -112,7 +114,7 @@ The examples presented here correspond to configuration files in the \texttt{exa
 \subsection{One dimensional harmonic oscillator}
 \subsubsection{Defining the problem}
 We are interested in the well known harmonic oscillator problem, in one dimension, that can be used as a sandbox to learn how to use \qsimu. 
-In this case Eq.~\eqref{eqn:gpe} reduces to:
+In this case equation~\eqref{eqn:gpe} reduces to:
 \begin{equation}
 \imath\hbar\frac{\partial}{\partial t}\psi(x,t)=\left(-\frac{\hbar^2}{2m}\frac{\partial^2}{\partial x^2}+\frac{1}{2}m\omega_x^2 x^2\right)\psi(x,t),
 \label{eqn:1dho}
@@ -131,10 +133,10 @@ This results in:
 \imath\frac{\partial}{\partial T}\Psi(X,T)=\left(-\frac{1}{2}\frac{\partial^2}{\partial X^2}+\frac{1}{2}X^2\right)\Psi(X,T).
 \label{eqn:1dlho}
 \end{equation}
-Now the problem is well posed, and one can see that Eq.~\eqref{eqn:1dlho} has no free parameter: with the dimensional reduction we will be able to obtain results relevant for any (non zero) value of the trapping frequency!
+Now the problem is well posed, and one can see that equation~\eqref{eqn:1dlho} has no free parameter: with the dimensional reduction we will be able to obtain results relevant for any (non zero) value of the trapping frequency!
 
 \subsubsection{Writing the configuration file}
-The problem has to be defined in a configuration file that \qsimu will use to build a numerical approximation of Eq.~\eqref{eqn:1dho}.
+The problem has to be defined in a configuration file that \qsimu will use to build a numerical approximation of equation~\eqref{eqn:1dho}.
 This is done by creating, using your favourite editor, a file \texttt{harmonic1D.cfg} that contains:
 \begin{verbatim}
 [general]
@@ -194,7 +196,7 @@ n_x\gg\left(\frac{1}{\sigma_X}+2\sigma_K\right)L_x
 \label{eqn:gridconstraint}
 \end{equation}
 
-In the case of the ground state of Eq.~\eqref{eqn:1dlho}, we know that the inequality is saturated, with $\sigma_X=\sigma_K=\frac{1}{\sqrt{2}}$, and according to the constraints~\eqref{eqn:gridconstraint} it is reasonable to choose $L_x=30$ and $n_x=128$.
+In the case of the ground state of equation~\eqref{eqn:1dlho}, we know that the inequality is saturated, with $\sigma_X=\sigma_K=\frac{1}{\sqrt{2}}$, and according to the constraints~\eqref{eqn:gridconstraint} it is reasonable to choose $L_x=30$ and $n_x=128$.
 Note that it is always better to choose a number of grid points in the form of a power of 2, as fast Fourier transform algorithm are optimized for this case.
 
 \subsubsection{Finding the ground state}
@@ -404,6 +406,7 @@ This error may be evaluated globally as:
 \section{Imaginary time propagation}
 \begin{figure}[htbp]
 \begin{center}
+\small
 \begin{tikzpicture}[auto,text width=3cm,node distance=2cm,text centered,
 	block/.style={rectangle,draw=black,fill=blue!20,thick,minimum height=1cm},
 	test/.style={diamond,draw=black,fill=blue!20,thick,inner sep=0pt,text width=2cm},
@@ -428,12 +431,14 @@ This error may be evaluated globally as:
 \path[line] (test2) -|node[near start] {yes} (update);
 \path[line] (update) |- (step);
 \end{tikzpicture}
+\normalsize
 \caption{Chart flow of the imaginary time propagation algorithm. Detail of one pass.}
 \end{center}
 \end{figure}
 
 \section{Spectrum of excitations}
-Assuming that $\psi_0(\bm{r})e^{-\imath\frac{\mu}{\hbar}t}$ is a stationary state of equation~\eqref{eqn:gpe}, with a time independant potential $V(\bm{r},t)=V(\bm{r})$, one can look for elementary excitations around this state in the form: $\psi(\bm{r},t)=e^{-\imath\frac{\mu}{\hbar}t}
+We briefly recall here the usual derivation of the Bogoliubov -- de Gennes equations. For a more complete and rigorous study one can refer to the work of \cite{Castin2001}.
+Assuming that $\psi_0(\bm{r})e^{-\imath\frac{\mu}{\hbar}t}$ is a stationary state of equation~\eqref{eqn:gpe}, with a time independent potential $V(\bm{r},t)=V(\bm{r})$, one can look for elementary excitations around this state in the form: $\psi(\bm{r},t)=e^{-\imath\frac{\mu}{\hbar}t}
 \left(\psi_0(\bm{r})+\delta\psi(\bm{r},t)\right)$.
 Assuming $\abs{\delta\psi(\bm{r},t)}\ll\abs{\psi_0(\bm{r})}$ and linearising equation~\eqref{eqn:gpe}, one get the following first order equation:
 \begin{equation}
@@ -506,4 +511,7 @@ z(\bm{r}_\perp)&=&\exp{-\tilde{\beta}\left(\frac{\tilde{x}^2+\tilde{y}^2}{2}+2\t
 +\tilde{n}_0(\tilde{\bm{r}}_\perp)\right)-\tilde{\mu}_\perp\right)}
 \end{eqnarray*}
 where $\tilde{\mu}_\perp=\frac{\mu-\frac{\hbar\omega_z}{2}}{\hbar\omega_\perp}$, $\tilde{g}=\sqrt{8\pi}\frac{a}{a_z}$, $\tilde{\beta}=\beta\hbar\omega_\perp$, $\tilde{\Lambda}=\sqrt{2\pi\tilde{\beta}}$, and $a_\perp=\sqrt{\frac{\hbar}{m\omega_\perp}}$.
+
+\bibliographystyle{plain}
+\bibliography{references}
 \end{document}
