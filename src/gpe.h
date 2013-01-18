@@ -55,7 +55,7 @@ class GPE {
         /*!\brief Write the header of an output file. */
         virtual void setHeader(std::ofstream &file) const=0;
         /*!\brief Get the header from an input file. */
-        virtual state getHeader(std::ifstream &file) =0;
+        virtual state getHeader(std::ifstream &file);
         /*!\brief Correct the hamiltonian for excited states. */
         virtual void correct(cvm::srmatrix &H, int m) {};
         /*!\brief Computes one step of evolution. */
@@ -79,6 +79,7 @@ class GPE {
         /*!\brief Imprint an integer winding number. */
         virtual void imprint(int l) {};
     protected:
+        const char *_type;
         cvm::srbmatrix _H0; //!<Single body hamiltonian, stored as a tridiagonal real matrix.
         cvm::cvector _psi;  //!<Groundstate wave function, stored as a complex vector.
         double _gN;         //!<Interaction term.

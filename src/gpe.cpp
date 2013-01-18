@@ -383,12 +383,24 @@ double GPE::epot() {
     return res/n2;
 }
 /* }}} */
+/* getHeader method {{{ */
+state GPE::getHeader(std::ifstream &file) {
+    char type[3];
+    file.read((char*)type,3*sizeof(char));
+    if(type[0]!=_type[0] || type[1]!=_type[1] || type[2]!=_type[2]) {
+        std::cerr << "[E] Incompatible type !" << std::endl;
+        return error;
+    }
+    return ok;
+}
+/* }}} */
 /* }}} */
 /* class Polar1D implementation {{{ */ 
 /* Constructor {{{ */
 Polar1D::Polar1D(ConfigMap &config, Expression *H,
         Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 1D Polar system" << std::endl;
+    _type="pol";
     _n=getConfig(config,string("grid::nr"),64);
     _rmin=getConfig(config,string("grid::rmin"),0.01);
     _rmax=getConfig(config,string("grid::rmax"),1.0);
@@ -468,8 +480,7 @@ void Polar1D::plot(int nmodes, std::string &name) {
 /* }}} */
 /* setHeader method {{{ */
 void Polar1D::setHeader(std::ofstream &file) const {
-    const char *type="Pol";
-    file.write((const char*)type,3*sizeof(char));
+    file.write((const char*)_type,3*sizeof(char));
     file.write((const char*)&_n,sizeof(int));
     file.write((const char*)&_rmin,sizeof(double));
     file.write((const char*)&_dr,sizeof(double));
@@ -479,20 +490,14 @@ void Polar1D::setHeader(std::ofstream &file) const {
 /* }}} */
 /* getHeader method {{{ */
 state Polar1D::getHeader(std::ifstream &file) {
-    char type[3];
-    double mu,dr,rmin;
-    int n,l;
-    file.read((char*)type,3*sizeof(char));
-    if(type[0]!='P' || type[1]!='o' || type[2]!='l') {
-        std::cerr << "[E] Incompatible type !" << std::endl;
+    if(GPE::getHeader(file)==error)
         return error;
-    }
+    int n;
     file.read((char*)&n,sizeof(int));
-    file.read((char*)&rmin,sizeof(double));
-    file.read((char*)&dr,sizeof(double));
-    file.read((char*)&l,sizeof(int));
-    file.read((char*)&mu,sizeof(double));
-    _mu=mu;
+    file.read((char*)&_rmin,sizeof(double));
+    file.read((char*)&_dr,sizeof(double));
+    file.read((char*)&_l,sizeof(int));
+    file.read((char*)&_mu,sizeof(double));
     if(n!=_n) {
         std::cerr << "[E] Incompatible size !" << std::endl;
         return error;
@@ -635,6 +640,7 @@ void Polar1D::initialize(Expression *pot) {
 GPE1D::GPE1D(ConfigMap &config, Expression *H,
         Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 1D Cartesian system" << std::endl;
+    _type="x1D";
     _n=getConfig(config,string("grid::nx"),64);
     _xmax=getConfig(config,string("grid::Lx"),0.01);
     _dx=_xmax/(_n-1);
@@ -723,8 +729,7 @@ void GPE1D::plot(int nmodes, std::string &name) {
 /* }}} */
 /* setHeader method {{{ */
 void GPE1D::setHeader(std::ofstream &file) const {
-    const char *type="x1D";
-    file.write((const char*)type,3*sizeof(char));
+    file.write((const char*)_type,3*sizeof(char));
     file.write((const char*)&_n,sizeof(int));
     file.write((const char*)&_xmax,sizeof(double));
     file.write((const char*)&_dx,sizeof(double));
@@ -733,19 +738,13 @@ void GPE1D::setHeader(std::ofstream &file) const {
 /* }}} */
 /* getHeader method {{{ */
 state GPE1D::getHeader(std::ifstream &file) {
-    char type[3];
-    double mu,dx,xmax;
-    int n;
-    file.read((char*)type,3*sizeof(char));
-    if(type[0]!='x' || type[1]!='1' || type[2]!='D') {
-        std::cerr << "[E] Incompatible type !" << std::endl;
+    if(GPE::getHeader(file)==error)
         return error;
-    }
+    int n;
     file.read((char*)&n,sizeof(int));
-    file.read((char*)&xmax,sizeof(double));
-    file.read((char*)&dx,sizeof(double));
-    file.read((char*)&mu,sizeof(double));
-    _mu=mu;
+    file.read((char*)&_xmax,sizeof(double));
+    file.read((char*)&_dx,sizeof(double));
+    file.read((char*)&_mu,sizeof(double));
     if(n!=_n) {
         std::cerr << "[E] Incompatible size !" << std::endl;
         return error;
@@ -820,6 +819,7 @@ double GPE1D::ekin() {
 /* Constructor {{{ */
 GPE2D::GPE2D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 2D Cartesian system" << std::endl;
+    _type="x2D";
     _nx=getConfig(config,string("grid::nx"),64);
     _ny=getConfig(config,string("grid::ny"),_nx);
     _xmax=getConfig(config,string("grid::Lx"),1.);
@@ -877,8 +877,7 @@ void GPE2D::plot(int nmode, std::string &name) {
 /* }}} */
 /* setHeader method {{{ */
 void GPE2D::setHeader(std::ofstream &file) const {
-    const char *type="x2D";
-    file.write((const char*)type,3*sizeof(char));
+    file.write((const char*)_type,3*sizeof(char));
     file.write((const char*)&_nx,sizeof(int));
     file.write((const char*)&_ny,sizeof(int));
     file.write((const char*)&_xmax,sizeof(double));
@@ -892,17 +891,15 @@ void GPE2D::setHeader(std::ofstream &file) const {
 state GPE2D::getHeader(std::ifstream &file) {
     char type[3];
     file.read((char*)type,3*sizeof(char));
-    if(type[0]=='x' && type[1]=='2' && type[2]=='D') {
-        double mu,dx,xmax,dy,ymax;
+    if(type[0]==_type[0] && type[1]==_type[1] && type[2]==_type[2]) {
         int nx,ny;
         file.read((char*)&nx,sizeof(int));
         file.read((char*)&ny,sizeof(int));
-        file.read((char*)&xmax,sizeof(double));
-        file.read((char*)&ymax,sizeof(double));
-        file.read((char*)&dx,sizeof(double));
-        file.read((char*)&dy,sizeof(double));
-        file.read((char*)&mu,sizeof(double));
-        _mu=mu;
+        file.read((char*)&_xmax,sizeof(double));
+        file.read((char*)&_ymax,sizeof(double));
+        file.read((char*)&_dx,sizeof(double));
+        file.read((char*)&_dy,sizeof(double));
+        file.read((char*)&_mu,sizeof(double));
         if(nx!=_nx || ny!=_ny) {
             std::cerr << "[E] Incompatible size !" << std::endl;
             return error;
@@ -910,12 +907,12 @@ state GPE2D::getHeader(std::ifstream &file) {
     } else if(type[0]=='P' || type[1]=='o' || type[2]=='l') { //Convert from Polar1D
         std::cerr << "[I] Converting from polar coordinates" << std::endl;
         int n,l;
-        double rmin,dr,mu;
+        double rmin,dr;
         file.read((char*)&n,sizeof(int));
         file.read((char*)&rmin,sizeof(double));
         file.read((char*)&dr,sizeof(double));
         file.read((char*)&l,sizeof(int));
-        file.read((char*)&mu,sizeof(double));
+        file.read((char*)&_mu,sizeof(double));
         std::complex<double> *v=new std::complex<double>[n];
         for(int i=0;i<n;i++) {
             file.read((char*)&(v[i].real()),sizeof(double));
@@ -925,7 +922,6 @@ state GPE2D::getHeader(std::ifstream &file) {
                 file.read((char*)&(v[i].imag()),sizeof(double));
             }
         }
-        _mu=mu;
         std::complex<double> *w=_psi.get();
         double xo=0.5*(_nx-1);
         double yo=0.5*(_ny-1);
@@ -1176,6 +1172,7 @@ std::string GPE2DROT::measure() {
 /* Constructor {{{ */
 GPE3D::GPE3D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H,pot) {
     std::cerr << "[I] Initializing a 3D Cartesian system" << std::endl;
+    _type="x3D";
     _nx=getConfig(config,string("grid::nx"),64);
     _ny=getConfig(config,string("grid::ny"),_nx);
     _nz=getConfig(config,string("grid::nz"),_ny);
@@ -1259,8 +1256,7 @@ void GPE3D::plot(int nmode, std::string &name) {
 /* }}} */
 /* setHeader method {{{ */
 void GPE3D::setHeader(std::ofstream &file) const {
-    const char *type="x3D";
-    file.write((const char*)type,3*sizeof(char));
+    file.write((const char*)_type,3*sizeof(char));
     file.write((const char*)&_nx,sizeof(int));
     file.write((const char*)&_ny,sizeof(int));
     file.write((const char*)&_nz,sizeof(int));
@@ -1275,28 +1271,21 @@ void GPE3D::setHeader(std::ofstream &file) const {
 /* }}} */
 /* getHeader method {{{ */
 state GPE3D::getHeader(std::ifstream &file) {
-    char type[3];
-    file.read((char*)type,3*sizeof(char));
-    if(type[0]=='x' && type[1]=='3' && type[2]=='D') {
-        double mu,dx,xmax,dy,ymax,dz,zmax;
-        int nx,ny,nz;
-        file.read((char*)&nx,sizeof(int));
-        file.read((char*)&ny,sizeof(int));
-        file.read((char*)&nz,sizeof(int));
-        file.read((char*)&xmax,sizeof(double));
-        file.read((char*)&ymax,sizeof(double));
-        file.read((char*)&zmax,sizeof(double));
-        file.read((char*)&dx,sizeof(double));
-        file.read((char*)&dy,sizeof(double));
-        file.read((char*)&dz,sizeof(double));
-        file.read((char*)&mu,sizeof(double));
-        _mu=mu;
-        if(nx!=_nx || ny!=_ny || nz!=_nz) {
-            std::cerr << "[E] Incompatible size !" << std::endl;
-            return error;
-        }
-    } else {
-        std::cerr << "[E] Incompatible type !" << std::endl;
+    if(GPE::getHeader(file)==error)
+        return error;
+    int nx,ny,nz;
+    file.read((char*)&nx,sizeof(int));
+    file.read((char*)&ny,sizeof(int));
+    file.read((char*)&nz,sizeof(int));
+    file.read((char*)&_xmax,sizeof(double));
+    file.read((char*)&_ymax,sizeof(double));
+    file.read((char*)&_zmax,sizeof(double));
+    file.read((char*)&_dx,sizeof(double));
+    file.read((char*)&_dy,sizeof(double));
+    file.read((char*)&_dz,sizeof(double));
+    file.read((char*)&_mu,sizeof(double));
+    if(nx!=_nx || ny!=_ny || nz!=_nz) {
+        std::cerr << "[E] Incompatible size !" << std::endl;
         return error;
     }
     return ok;
@@ -1533,6 +1522,7 @@ GPE2DThermal::GPE2DThermal(ConfigMap &config, Expression *H, Expression *pot,Var
     int n=_psi.size();
     _n0=new double[n];
     memset(_n0,0,n*sizeof(double));
+    _type="T2D";
 }
 /* }}} */
 /* doStep method {{{ */
@@ -1601,44 +1591,27 @@ std::string GPE2DThermal::measure() {
 /* }}} */
 /* setHeader method {{{ */
 void GPE2DThermal::setHeader(std::ofstream &file) const {
-    const char *type="T2D";
-    file.write((const char*)type,3*sizeof(char));
-    file.write((const char*)&_nx,sizeof(int));
-    file.write((const char*)&_ny,sizeof(int));
-    file.write((const char*)&_xmax,sizeof(double));
-    file.write((const char*)&_ymax,sizeof(double));
-    file.write((const char*)&_dx,sizeof(double));
-    file.write((const char*)&_dy,sizeof(double));
-    file.write((const char*)&_mu,sizeof(double));
+    GPE2D::setHeader(file);
     file.write((const char*)&_Nbec,sizeof(double));
     file.write((const char*)&_Ntherm,sizeof(double));
 }
 /* }}} */
 /* getHeader method {{{ */
 state GPE2DThermal::getHeader(std::ifstream &file) {
-    char type[3];
-    file.read((char*)type,3*sizeof(char));
-    if(type[0]=='T' && type[1]=='2' && type[2]=='D') {
-        double mu,dx,xmax,dy,ymax,Nbec,Ntherm;
-        int nx,ny;
-        file.read((char*)&nx,sizeof(int));
-        file.read((char*)&ny,sizeof(int));
-        file.read((char*)&xmax,sizeof(double));
-        file.read((char*)&ymax,sizeof(double));
-        file.read((char*)&dx,sizeof(double));
-        file.read((char*)&dy,sizeof(double));
-        file.read((char*)&mu,sizeof(double));
-        file.read((char*)&Nbec,sizeof(double));
-        file.read((char*)&Ntherm,sizeof(double));
-        _mu=mu;
-        _Nbec=Nbec;
-        _Ntherm=Ntherm;
-        if(nx!=_nx || ny!=_ny) {
-            std::cerr << "[E] Incompatible size !" << std::endl;
-            return error;
-        }
-    } else {
-        std::cerr << "[E] Incompatible type !" << std::endl;
+    if(GPE::getHeader(file)==error)
+        return error;
+    int nx,ny;
+    file.read((char*)&nx,sizeof(int));
+    file.read((char*)&ny,sizeof(int));
+    file.read((char*)&_xmax,sizeof(double));
+    file.read((char*)&_ymax,sizeof(double));
+    file.read((char*)&_dx,sizeof(double));
+    file.read((char*)&_dy,sizeof(double));
+    file.read((char*)&_mu,sizeof(double));
+    file.read((char*)&_Nbec,sizeof(double));
+    file.read((char*)&_Ntherm,sizeof(double));
+    if(nx!=_nx || ny!=_ny) {
+        std::cerr << "[E] Incompatible size !" << std::endl;
         return error;
     }
     return ok;
@@ -1735,6 +1708,7 @@ Polar1DThermal::Polar1DThermal(ConfigMap &config, Expression *H, Expression *pot
     int n=_psi.size();
     _n0=new double[n];
     memset(_n0,0,n*sizeof(double));
+    _type="P1T";
 }
 /* }}} */
 /* doStep method {{{ */
@@ -1830,41 +1804,17 @@ void Polar1DThermal::findGroundState(double dttest, double tol, double dttol, st
 /* }}} */
 /* setHeader method {{{ */
 void Polar1DThermal::setHeader(std::ofstream &file) const {
-    const char *type="P1T";
-    file.write((const char*)type,3*sizeof(char));
-    file.write((const char*)&_n,sizeof(int));
-    file.write((const char*)&_rmin,sizeof(double));
-    file.write((const char*)&_dr,sizeof(double));
-    file.write((char*)&_l,sizeof(int));
-    file.write((const char*)&_mu,sizeof(double));
+    Polar1D::setHeader(file);
     file.write((const char*)&_Nbec,sizeof(double));
     file.write((const char*)&_Ntherm,sizeof(double));
 }
 /* }}} */
 /* getHeader method {{{ */
 state Polar1DThermal::getHeader(std::ifstream &file) {
-    char type[3];
-    double mu,dr,rmin,Nbec,Ntherm;
-    int n,l;
-    file.read((char*)type,3*sizeof(char));
-    if(type[0]!='P' || type[1]!='1' || type[2]!='T') {
-        std::cerr << "[E] Incompatible type !" << std::endl;
+    if(Polar1D::getHeader(file)==error)
         return error;
-    }
-    file.read((char*)&n,sizeof(int));
-    file.read((char*)&rmin,sizeof(double));
-    file.read((char*)&dr,sizeof(double));
-    file.read((char*)&l,sizeof(int));
-    file.read((char*)&mu,sizeof(double));
-    file.read((char*)&Nbec,sizeof(double));
-    file.read((char*)&Ntherm,sizeof(double));
-    _mu=mu;
-    _Nbec=Nbec;
-    _Ntherm=Ntherm;
-    if(n!=_n) {
-        std::cerr << "[E] Incompatible size !" << std::endl;
-        return error;
-    }
+    file.read((char*)&_Nbec,sizeof(double));
+    file.read((char*)&_Ntherm,sizeof(double));
     return ok;
 }
 /* }}} */
