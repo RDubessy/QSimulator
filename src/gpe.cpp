@@ -96,6 +96,7 @@ GPE::GPE(Expression *H, Expression *pot) {
  * \param tol the relative target accuracy for the chemical potential.
  * \param dttol the relative target accuracy on the fonction norm.
  * \param name a string containing the name of a log file.
+ * \param verb an integer controlling the verbosity of the displayed output.
  */
 void GPE::findGroundState(double dttest, double tol, double dttol, string &name, int verb) {
     std::cerr << "[I] Find groundstate method..." << std::endl;

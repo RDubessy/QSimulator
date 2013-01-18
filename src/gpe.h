@@ -269,6 +269,7 @@ class GPE3DROT : public GPE3D {
         std::complex<double> *_phase2;//!<Correction to the kinetic energy contribution.
 };
 /* }}} */
+/* class GPE2DThermal {{{ */
 class GPE2DThermal : public GPE2D, public Thermal {
     public:
         /*!\brief Constructor. */
@@ -283,8 +284,11 @@ class GPE2DThermal : public GPE2D, public Thermal {
         void setHeader(std::ofstream &file) const;
         state getHeader(std::ifstream &file);
 };
+/* }}} */
+/* class Polar1DThermal {{{ */
 class Polar1DThermal : public Polar1D, public Thermal {
     public:
+        /*!\brief Constructor. */
         Polar1DThermal(ConfigMap &config, Expression *H, Expression *pot, VarDef &params);
         void doStep(std::complex<double> dt);
         std::string measure();
@@ -296,5 +300,6 @@ class Polar1DThermal : public Polar1D, public Thermal {
         void setHeader(std::ofstream &file) const;
         state getHeader(std::ifstream &file);
 };
+/* }}} */
 #endif //GPE_H
 /* gpe.h */
