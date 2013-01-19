@@ -1,8 +1,13 @@
 /* Copyright (C) 2013 Romain Dubessy */
 #ifndef GPE_H
 #define GPE_H
-#include <cvm.h>
-#include <fftw3.h>
+#include <cvm.h>        //For cvm namespace
+#include <fftw3.h>      //For fftw
+#include <common.h>     //For ConfigMap
+#include <expression.h> //For Expression, VarDef
+const Constant zero(0);
+const Constant one(1);
+const double pi=acos(-1);
 enum state {
     ok,error,converted
 };
@@ -37,9 +42,9 @@ class GPE {
         /*!\brief Constructor. */
         GPE(Expression *H, Expression *pot);
         /*!\brief Computes the groundstate wave function of the system. */
-        virtual void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
+        virtual void findGroundState(double dttest, double tol, double dttol, std::string &name, int verb=0);
         /*!\brief Computes the Bogolyubov spectrum of the system. */
-        virtual void spectrum(string &name, int m=0);
+        virtual void spectrum(std::string &name, int m=0);
         /*!\brief Normalize the groundstate wave function. */
         double normalize();
         /*!\brief Computes the norm of a real vector. */
@@ -94,212 +99,6 @@ class GPE {
         Expression *_H;     //!<Symbolic representation of the Hamiltonian.
     private:
         Expression *_pot;   //!<Symbolic representation of the potential.
-};
-/* }}} */
-/* class Polar1D {{{ */
-/*!\brief This class implements a Gross-Pitaevskii equation in polar coordinates
- * (2D space) assuming rotational invariance, which allows to reduce the problem
- * to an effective 1D equation.
- *
- * In this case the laplacian is:
- * \f[
- * \Delta=\frac{\partial^2}{\partial r^2}+\frac{1}{r}\frac{\partial}{\partial r}
- * -\frac{\ell^2}{r^2},
- * \f]
- * where \f$\ell\f$ is a quantum number associated to the rotational invariance,
- * namely:
- * \f[
- * \hat{L}_z\psi=\hbar\ell\psi.
- * \f]
- */
-class Polar1D : public GPE {
-    public:
-        /*!\brief Constructor. */
-        Polar1D(ConfigMap &config, Expression *H, Expression *pot);
-        double norm(cvm::rvector &psi) const;
-        double norm(cvm::cvector &psi) const;
-        void plot(int nmode, std::string &name);
-        void setHeader(std::ofstream &file) const;
-        state getHeader(std::ifstream &file);
-        void correct(cvm::srmatrix &H, int m);
-        void doStep(std::complex<double> dt);
-        void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
-        void initialize(Expression *pot);
-    protected:
-        double _rmin;   //!<Minimum allowed radius.
-        double _dr;     //!<Grid step size.
-        int _n;         //!<Number of grid points.
-        int _l;         //!<Quantum number associated to the rotationnal invariance.
-    private:
-        double _rmax;   //!<Maximum allowed radius.
-};
-/* }}} */
-/* class GPE1D {{{ */
-/*!\brief This class implements a Gross-Pitaevskii equation in a one dimensional
- * space.
- *
- * In this case the laplacian is:
- * \f[\Delta=\frac{\partial^2}{\partial x^2}.\f]
- */
-class GPE1D : public GPE {
-    public:
-        /*!\brief Constructor. */
-        GPE1D(ConfigMap &config, Expression *H, Expression *pot);
-        double norm(cvm::rvector &psi) const;
-        double norm(cvm::cvector &psi) const;
-        void plot(int nmode, std::string &name);
-        void setHeader(std::ofstream &file) const;
-        state getHeader(std::ifstream &file);
-        void computePhase(std::complex<double> dt);
-        void initialize(Expression *pot);
-        double ekin();
-    private:
-        double _xmax;   //!<Half box size.
-        double _dx;     //!<Grid step size.
-        int _n;         //!<Number of grid points.
-};
-/* }}} */
-/* class GPE2D {{{ */
-/*!\brief This class implements a Gross Pitaevskii equation in a two
- * dimensional space.
- *
- * In this case the laplacian is:
- * \f[\Delta=\frac{\partial^2}{\partial x^2}+\frac{\partial^2}{\partial y^2}.\f]
- */
-class GPE2D : public GPE {
-    public:
-        /*!\brief Constructor. */
-        GPE2D(ConfigMap &config, Expression *H, Expression *pot);
-        void spectrum(string &name, int m=0);
-        double norm(cvm::rvector &psi) const;
-        double norm(cvm::cvector &psi) const;
-        void plot(int nmode, std::string &name);
-        void setHeader(std::ofstream &file) const;
-        state getHeader(std::ifstream &file);
-        void computePhase(std::complex<double> dt);
-        void initialize(Expression *pot);
-        double ekin();
-        void imprint(int l);
-        /*!\brief Initialize resources for the FFT. */
-        virtual void initializeFFT();
-    protected:
-        double _dx;     //!<Grid step size along X
-        double _dy;     //!<Grid step size along Y
-        int _nx;        //!<Number of grid points along X
-        int _ny;        //!<Number of grid points along Y
-        double _xmax;   //!<Maximum value of X on the grid
-        double _ymax;   //!<Maximum value of Y on the grid
-};
-/* }}} */
-/* class GPE2DROT {{{ */
-/*!\brief This class implements a Gross Pitaevskii equation in a two dimensional
- * space whithin a rotating frame.
- *
- * In this case the laplacian is:
- * \f[\Delta=\frac{\partial^2}{\partial x^2}+\frac{\partial^2}{\partial y^2}.\f]
- */
-class GPE2DROT : public GPE2D {
-    public:
-        /*!\brief Constructor. */
-        GPE2DROT(ConfigMap &config, Expression *H, Expression *pot);
-        void doStep(std::complex<double> dt);
-        void computePhase(std::complex<double> dt);
-        void initializeFFT();
-        void update(double dt);
-        std::string measure();
-    private:
-        double _oterm;          //!<Rotation term (angular rotation frequency).
-        fftw_plan _planFFTxz;   //!<Resource for forward FFT.
-        fftw_plan _planFFTy;    //!<Resource for forward FFT.
-        fftw_plan _planIFFTx;   //!<Resource for backward FFT.
-        fftw_plan _planIFFTyz;  //!<Resource for backward FFT.
-        std::complex<double> *_phase2;//!<Correction to the kinetic energy contribution.
-};
-/* }}} */
-/* class GPE3D {{{ */
-/*!\brief This class implements a Gross Pitaevskii equation in a three
- * dimensional space.
- */
-class GPE3D : public GPE {
-    public:
-        /*!\brief Constructor. */
-        GPE3D(ConfigMap &config, Expression *H, Expression *pot);
-        void spectrum(string &name, int m=0);
-        double norm(cvm::rvector &psi) const;
-        double norm(cvm::cvector &psi) const;
-        void plot(int nmode, std::string &name);
-        void setHeader(std::ofstream &file) const;
-        state getHeader(std::ifstream &file);
-        void computePhase(std::complex<double> dt);
-        void initialize(Expression *pot);
-        double ekin();
-        /*!\brief Initialize resources for the FFT. */
-        virtual void initializeFFT();
-    protected:
-        double _dx;     //!<Grid step size along X
-        double _dy;     //!<Grid step size along Y
-        double _dz;     //!<Grid step size along Z
-        int _nx;        //!<Number of grid points along X
-        int _ny;        //!<Number of grid points along Y
-        int _nz;        //!<Number of grid points along Z
-    private:
-        double _xmax;   //!<Maximum value of X on the grid
-        double _ymax;   //!<Maximum value of Y on the grid
-        double _zmax;   //!<Maximum value of Z on the grid
-};
-/* }}} */
-/* class GPE3DROT {{{ */
-/*!\brief This class implements a Gross Pitaevskii equation in a three 
- * dimensional space whithin a rotating frame.
- */
-class GPE3DROT : public GPE3D {
-    public:
-        /*!\brief Constructor. */
-        GPE3DROT(ConfigMap &config, Expression *H, Expression *pot);
-        void doStep(std::complex<double> dt);
-        void computePhase(std::complex<double> dt);
-        void initializeFFT();
-        void update(double dt);
-        std::string measure();
-    private:
-        double _oterm;          //!<Rotation term (angular rotation frequency).
-        fftw_plan _planFFTxz;   //!<Resource for forward FFT.
-        fftw_plan _planFFTy;    //!<Resource for forward FFT.
-        fftw_plan _planIFFTx;   //!<Resource for backward FFT.
-        fftw_plan _planIFFTyz;  //!<Resource for backward FFT.
-        std::complex<double> *_phase2;//!<Correction to the kinetic energy contribution.
-};
-/* }}} */
-/* class GPE2DThermal {{{ */
-class GPE2DThermal : public GPE2D, public Thermal {
-    public:
-        /*!\brief Constructor. */
-        GPE2DThermal(ConfigMap &config, Expression *H, Expression *pot, VarDef &params);
-        void doStep(std::complex<double> dt);
-        std::string measure();
-        void plot(int nmode, std::string &name);
-        void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
-        double thermalStep();
-        void save(std::string &name) const;
-        void load(std::string &name);
-        void setHeader(std::ofstream &file) const;
-        state getHeader(std::ifstream &file);
-};
-/* }}} */
-/* class Polar1DThermal {{{ */
-class Polar1DThermal : public Polar1D, public Thermal {
-    public:
-        /*!\brief Constructor. */
-        Polar1DThermal(ConfigMap &config, Expression *H, Expression *pot, VarDef &params);
-        void doStep(std::complex<double> dt);
-        std::string measure();
-        void plot(int nmode, std::string &name);
-        void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
-        double thermalStep();
-        void save(std::string &name) const;
-        void load(std::string &name);
-        void setHeader(std::ofstream &file) const;
-        state getHeader(std::ifstream &file);
 };
 /* }}} */
 #endif //GPE_H

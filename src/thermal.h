@@ -1,6 +1,8 @@
 /* Copyright (C) 2013 Romain Dubessy */
 #ifndef THERMAL_H
 #define THERMAL_H
+#include <common.h>     //For ConfigMap
+#include <expression.h> //For VarDef
 double polylog3half(double z);
 /*!\brief This class describe a semi-classical Bose gas.
  */

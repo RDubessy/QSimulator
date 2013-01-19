@@ -15,10 +15,8 @@
  * along with QSimulator.  If not, see <http://www.gnu.org/licenses/>.
  *
  * }}} */
-#include <iostream>
-#include <common.h>     //For ConfigMap.
-#include <expression.h> //For Expression, VarDef.
 #include "thermal.h"
+#include <iostream>
 /* Tabulated values of Polylogarithm for three dimensional case.  {{{ */
 double polylog3halfTable[65536] = {
 0., 0.000015259104217955884, 0.000030518373081165775, 

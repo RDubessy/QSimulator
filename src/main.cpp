@@ -21,8 +21,9 @@
 #include <fstream>      //For ofstream/ifstream...
 #include <common.h>     //For ConfigMap.
 #include <expression.h> //For Expression, VarDef.
-#include "thermal.h"    //For Thermal class.
 #include "gpe.h"        //For GPE class (and sub-classes).
+#include "gpe1D.h"      //For GPE1D class.
+#include "gpe2D.h"      //For GPE2D class.
 /* mainFunction method {{{ */
 int mainFunction(ConfigMap &config) {
     if(config.find("general::equation")==config.end()) {
