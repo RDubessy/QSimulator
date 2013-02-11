@@ -2,6 +2,7 @@
 #ifndef GPE3D_H
 #define GPE3D_H
 #include "gpe.h"
+#include "thermal.h"
 /* class GPE3D {{{ */
 /*!\brief This class implements a Gross Pitaevskii equation in a three
  * dimensional space.
@@ -28,7 +29,6 @@ class GPE3D : public GPE {
         int _nx;        //!<Number of grid points along X
         int _ny;        //!<Number of grid points along Y
         int _nz;        //!<Number of grid points along Z
-    private:
         double _xmax;   //!<Maximum value of X on the grid
         double _ymax;   //!<Maximum value of Y on the grid
         double _zmax;   //!<Maximum value of Z on the grid
@@ -54,6 +54,22 @@ class GPE3DROT : public GPE3D {
         fftw_plan _planIFFTx;   //!<Resource for backward FFT.
         fftw_plan _planIFFTyz;  //!<Resource for backward FFT.
         std::complex<double> *_phase2;//!<Correction to the kinetic energy contribution.
+};
+/* }}} */
+/* class GPE3DThermal {{{ */
+class GPE3DThermal : public GPE3D, public Thermal {
+    public:
+        /*!\brief Constructor. */
+        GPE3DThermal(ConfigMap &config, Expression *H, Expression *pot, VarDef &params);
+        void plot(int nmode, std::string &name);
+        std::string measure();
+        void setHeader(std::ofstream &file) const;
+        state getHeader(std::ifstream &file);
+        void save(std::string &name) const;
+        void load(std::string &name);
+        void doStep(std::complex<double> dt);
+        void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
+        double thermalStep();
 };
 /* }}} */
 #endif //GPE3D_H

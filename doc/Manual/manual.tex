@@ -30,6 +30,7 @@ See section~\ref{sec:doc} to generate the programming reference, relative to the
 
 The \qsimu code aims at providing an intuitive interface for solving the non linear Schrödinger equation with a special emphasis on the bi-dimensional case.
 \end{abstract}
+
 \begin{table}
 \begin{center}
 \begin{tabular}{c|l}
@@ -49,7 +50,7 @@ $\hbar=\frac{h}{2\pi}$ & Reduced Planck constant\\
 \chapter{Introduction}
 This program is designed to study the non linear Schrödinger equation (NLSE), also called Gross-Pitaevskii equation (GPE) in the cold atom community:
 \begin{equation}
-\imath\hbar\frac{\partial}{\partial t}\psi(\bm{r},t)=\left(-\frac{\hbar^2}{2m}\Delta+V(\bm{r},t)+gN\abs{\psi(t,\bm{r})}^2\right)\psi(\bm{r},t),
+\imath\hbar\frac{\partial}{\partial t}\psi(\bm{r},t)=\left(-\frac{\hbar^2}{2m}\Delta+V(\bm{r},t)+gN\abs{\psi(\bm{r},t)}^2\right)\psi(\bm{r},t),
 \label{eqn:gpe}
 \end{equation}
 white the proper normalisation $\int \bm{dr}\abs{\psi(t,\bm{r})}^2=1$.
@@ -335,6 +336,7 @@ For convenience the following list is alphabetically sorted.
 \item \texttt{[parameters]} is a label indicating the beginning of the user defined parameters assignation.
 \item \texttt{potential = ...} defines the spatial dependence of the trapping potential. It can use either Cartesian coordinates (\texttt{X}, \texttt{Y} and \texttt{Z}) or cylindrical coordinates (\texttt{R}, \texttt{THETA}, \texttt{Z}), that may by combined using mathematical expressions.
 \item \texttt{RHO} represents an interaction term proportional to the local particle density.
+\item \texttt{[thermal]} is a label indicating the thermal configuration options.
 \item \texttt{VEXT} represents the external trapping potential in the \texttt{equation}. Its value is defined in the \texttt{potential} assignation.
 \end{itemize}
 
@@ -511,6 +513,18 @@ z(\bm{r}_\perp)&=&\exp{-\tilde{\beta}\left(\frac{\tilde{x}^2+\tilde{y}^2}{2}+2\t
 +\tilde{n}_0(\tilde{\bm{r}}_\perp)\right)-\tilde{\mu}_\perp\right)}
 \end{eqnarray*}
 where $\tilde{\mu}_\perp=\frac{\mu-\frac{\hbar\omega_z}{2}}{\hbar\omega_\perp}$, $\tilde{g}=\sqrt{8\pi}\frac{a}{a_z}$, $\tilde{\beta}=\beta\hbar\omega_\perp$, $\tilde{\Lambda}=\sqrt{2\pi\tilde{\beta}}$, and $a_\perp=\sqrt{\frac{\hbar}{m\omega_\perp}}$.
+
+\chapter{Quasi two dimensional}
+\begin{eqnarray*}
+\psi(\bm{r})&=&\sum_n\psi_n(\bm{r}_\perp)\phi_n(z)\\
+E&=&\int d^3\bm{r}\psi^*\left(-\frac{\hbar^2}{2m}\bm{\nabla}^2+V(\bm{r}_\perp)+\frac{1}{2}m\omega_z^2z^2+\frac{g}{2}\abs{\psi}^2-\mu\right)\psi\\
+&=&\sum_n\int d^2\bm{r}_\perp\psi_n^*\left(\hbar\omega_z\left(n+\frac{1}{2}\right)-\frac{\hbar^2}{2m}\bm{\nabla}_\perp^2+V(\bm{r}_\perp)-\mu\right)\psi_n
++\frac{g}{2}\int d^3\bm{r}\abs{\psi}^4\\
+\mu_n&=&\mu-\hbar\omega_z\left(n+\frac{1}{2}\right)\\
+\mu_n\psi_n(\bm{r}_\perp)&=&\left(-\frac{\hbar^2}{2m}\bm{\nabla}_\perp^2+V(\bm{r}_\perp)\right)\psi_n(\bm{r}_\perp)
++\sum_{j,k,l}g_{n,j,k,l}\psi_j(\bm{r}_\perp)^*\psi_k(\bm{r}_\perp)\psi_l(\bm{r}_\perp)\\
+g_{n,j,k,l}&=&g\int dz\phi_n(z)\phi_j(z)\phi_k(z)\phi_l(z)\\
+\end{eqnarray*}
 
 \bibliographystyle{plain}
 \bibliography{references}

@@ -864,22 +864,10 @@ void GPE2DThermal::setHeader(std::ofstream &file) const {
 /* }}} */
 /* getHeader method {{{ */
 state GPE2DThermal::getHeader(std::ifstream &file) {
-    if(GPE::getHeader(file)==error)
+    if(GPE2D::getHeader(file)==error)
         return error;
-    int nx,ny;
-    file.read((char*)&nx,sizeof(int));
-    file.read((char*)&ny,sizeof(int));
-    file.read((char*)&_xmax,sizeof(double));
-    file.read((char*)&_ymax,sizeof(double));
-    file.read((char*)&_dx,sizeof(double));
-    file.read((char*)&_dy,sizeof(double));
-    file.read((char*)&_mu,sizeof(double));
     file.read((char*)&_Nbec,sizeof(double));
     file.read((char*)&_Ntherm,sizeof(double));
-    if(nx!=_nx || ny!=_ny) {
-        std::cerr << "[E] Incompatible size !" << std::endl;
-        return error;
-    }
     return ok;
 }
 /* }}} */

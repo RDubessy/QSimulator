@@ -365,4 +365,209 @@ std::string GPE3DROT::measure() {
 }
 /* }}} */
 /* }}} */
+/* class GPE3DThermal implementation {{{ */
+/* Constructor {{{ */
+GPE3DThermal::GPE3DThermal(ConfigMap &config, Expression *H, Expression *pot,VarDef &params) : GPE3D(config,H,pot), Thermal(config,params) {
+    int n=_psi.size();
+    _n0=new double[n];
+    memset(_n0,0,n*sizeof(double));
+    _type="T3D";
+}
+/* }}} */
+/* doStep method {{{ */
+void GPE3DThermal::doStep(std::complex<double> dt) {
+    int n=_psi.size();
+    std::complex<double> *v=_psi.get();
+    for(int i=0;i<n;i++)
+        v[i]*=std::exp(dt*(_vpot[i]+_gN*(_Nbec*std::norm(v[i])+2*_n0[i])-_mu));
+    fftw_execute(_planFFT);
+    for(int i=0;i<n;i++)
+        _psip[i]*=_phase[i];
+    fftw_execute(_planIFFT);
+}
+/* }}} */
+/* thermalStep method {{{ */
+double GPE3DThermal::thermalStep() {
+    int n=_psi.size();
+    std::complex<double> *v=_psi.get();
+    for(int i=0;i<n;i++) {
+        double z=std::exp(-_beta*(_vpot[i]+2*_gN*(_Nbec*std::norm(v[i])+_n0[i])-_mu));
+        if(z<=1)
+            _n0[i]=polylog3half(z)/(_lambda*_lambda*_lambda);
+    }
+    double nth=0;
+    for(int i=0;i<n;i++) {
+        nth+=_n0[i];
+    }
+    nth*=_dx*_dy*_dz;
+    return nth;
+}
+/* }}} */
+/* findGroundState method {{{ */
+void GPE3DThermal::findGroundState(double dttest, double tol, double dttol, string &name, int verb) {
+    double nold,eps;
+    int n=_psi.size();
+    do {
+        nold=_Ntherm;
+        double ntmp,rel,mutmp,murel;
+        do {
+            ntmp=_Ntherm;
+            mutmp=_mu;
+            GPE::findGroundState(dttest,tol,dttol,name,verb);
+            _Ntherm=thermalStep();
+            rel=std::abs((ntmp-_Ntherm)/_Ntherm);
+            murel=std::abs((mutmp-_mu)/_mu);
+        } while(rel>1e-3 || murel>1e-7);
+        double ntot=_Nbec+_Ntherm;
+        double scale=_Ntot/ntot;
+        _Nbec*=scale;
+        _Ntherm*=scale;
+        for(int i=0;i<n;i++)
+            _n0[i]*=scale;
+        std::cerr << "[I] Thermal step: [" << _Nbec << "/" << _Ntherm << "] " << std::endl;
+        eps=std::abs(nold-_Ntherm);
+    } while(eps>1);
+}
+/* }}} */
+/* measure method {{{ */
+std::string GPE3DThermal::measure() {
+    std::ostringstream mes;
+    mes.precision(15);
+    mes << _mu << ' ' << epot() << ' ' << ekin() << ' ' << _Nbec << ' ' << _Ntherm;
+    std::string res=mes.str();
+    return res;
+}
+/* }}} */
+/* setHeader method {{{ */
+void GPE3DThermal::setHeader(std::ofstream &file) const {
+    GPE3D::setHeader(file);
+    file.write((const char*)&_Nbec,sizeof(double));
+    file.write((const char*)&_Ntherm,sizeof(double));
+}
+/* }}} */
+/* getHeader method {{{ */
+state GPE3DThermal::getHeader(std::ifstream &file) {
+    if(GPE3D::getHeader(file)==error)
+        return error;
+    file.read((char*)&_Nbec,sizeof(double));
+    file.read((char*)&_Ntherm,sizeof(double));
+    return ok;
+}
+/* }}} */
+/* save method {{{ */
+void GPE3DThermal::save(std::string &name) const {
+    std::ofstream file(name.c_str(),std::ofstream::binary);
+    if(file.is_open()) {
+        setHeader(file);
+        const std::complex<double> *v=_psi.get();
+        int n=_psi.size();
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(v[i].real()),sizeof(double));
+        }
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(v[i].imag()),sizeof(double));
+        }
+        for(int i=0;i<n;i++) {
+            file.write((const char*)&(_n0[i]),sizeof(double));
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file:" << name << std::endl;
+    }
+    return;
+}
+/* }}} */
+/* load method {{{ */
+void GPE3DThermal::load(std::string &name) {
+    std::ifstream file(name.c_str(),std::ifstream::binary);
+    if(file.is_open()) {
+        switch(getHeader(file)) {
+            case ok:
+                {
+                    std::complex<double> *v=_psi.get();
+                    int n=_psi.size();
+                    std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << n << ")" << std::endl;
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(v[i].real()),sizeof(double));
+                    }
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(v[i].imag()),sizeof(double));
+                    }
+                    std::cerr << "[I] Loading thermal part [" << _Nbec << "/" << _Ntherm << "]" << std::endl;
+                    for(int i=0;i<n;i++) {
+                        file.read((char*)&(_n0[i]),sizeof(double));
+                    }
+                }
+            case error:
+            case converted:
+            default:
+                file.close();
+        }
+    } else {
+        std::cerr << "[E] Can't open file:" << name << std::endl;
+    }
+    return;
+}
+/* }}} */
+/* plot method {{{ */
+void GPE3DThermal::plot(int nmode, std::string &name) {
+    std::ofstream file;
+    file.open("/tmp/psiXY.txt");
+    if(file.is_open()) {
+        const std::complex<double> *psi=_psi.get();
+        for(int j=0;j<_ny;j++) {
+            for(int i=0;i<_nx;i++) {
+                double psi2=0;
+                double nz=0;
+                for(int k=0;k<_nz;k++) {
+                    psi2+=std::norm(psi[i+(j+k*_ny)*_nx]);
+                    nz+=_n0[i+(j+k*_ny)*_nz];
+                }
+                psi2/=2*_zmax;
+                nz/=2*_zmax;
+                file << i*_dx-_xmax << ' ' << j*_dy-_ymax << ' ' << psi2 << ' ' << nz
+                    << '\n';
+            }
+            file << '\n';
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file \"/tmp/psiXY.txt\" !" << std::endl;
+    }
+    file.open("/tmp/psiXZ.txt");
+    if(file.is_open()) {
+        const std::complex<double> *psi=_psi.get();
+        for(int k=0;k<_nz;k++) {
+            for(int i=0;i<_nx;i++) {
+                double psi2=0;
+                double ny=0;
+                for(int j=0;j<_ny;j++) {
+                    psi2+=std::norm(psi[i+(j+k*_ny)*_nx]);
+                    ny+=_n0[i+(j+k*_ny)*_nx];
+                }
+                psi2/=2*_ymax;
+                ny/=2*_ymax;
+                file << i*_dx-_xmax << ' ' << k*_dz-_zmax << ' ' << psi2 << ' ' << ny
+                    << '\n';
+            }
+            file << '\n';
+        }
+        file.close();
+    } else {
+        std::cerr << "[E] Can't open file \"/tmp/psiXZ.txt\" !" << std::endl;
+    }
+    std::cout << "set view map;unset surface;set pm3d;unset key;"
+        << "set size square;set size 1,1;set origin 0,0;"
+        << "set multiplot layout 2,2;"
+        << "splot \"/tmp/psiXY.txt\" using 1:2:3;"
+        << "splot \"/tmp/psiXY.txt\" using 1:2:4;"
+        << "splot \"/tmp/psiXZ.txt\" using 1:2:3;"
+        << "splot \"/tmp/psiXZ.txt\" using 1:2:4;"
+        << "unset multiplot;"
+        << "pause mouse\n";
+    std::cout.flush();
+    return;
+}
+/* }}} */
+/* }}} */
 /* gpe.cpp */

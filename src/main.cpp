@@ -21,9 +21,10 @@
 #include <fstream>      //For ofstream/ifstream...
 #include <common.h>     //For ConfigMap.
 #include <expression.h> //For Expression, VarDef.
-#include "gpe.h"        //For GPE class (and sub-classes).
+#include "gpe.h"        //For GPE class.
 #include "gpe1D.h"      //For GPE1D class.
-#include "gpe2D.h"      //For GPE2D class.
+#include "gpe2D.h"      //For GPE2D/Polar1D class (and derived classes).
+#include "gpe3D.h"      //For GPE3D class (and derived classes).
 /* mainFunction method {{{ */
 int mainFunction(ConfigMap &config) {
     if(config.find("general::equation")==config.end()) {
@@ -51,7 +52,10 @@ int mainFunction(ConfigMap &config) {
     if(config.find("thermal::N")!=config.end()) {
         if(pot->find("X")) {
             if(pot->find("Y")) {
-                gpe=new GPE2DThermal(config,eqn,pot,params);
+                if(pot->find("Z"))
+                    gpe=new GPE3DThermal(config,eqn,pot,params);
+                else
+                    gpe=new GPE2DThermal(config,eqn,pot,params);
             }
         } else if(pot->find("R"))
             gpe=new Polar1DThermal(config,eqn,pot,params);
