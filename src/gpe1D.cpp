@@ -27,7 +27,6 @@ GPE1D::GPE1D(ConfigMap &config, Expression *H,
     _xmax=getConfig(config,string("grid::Lx"),0.01);
     _dx=_xmax/(_n-1);
     _xmax/=2;
-    _psi.resize(_n);
     _H0.resize(_n);
     _H0.resize_lu(1,1);
     allocate(_n);
@@ -39,6 +38,13 @@ double GPE1D::norm(cvm::rvector &psi) const {
 }
 double GPE1D::norm(cvm::cvector &psi) const {
     return sqrt(_dx)*psi.norm2();
+}
+double GPE1D::norm() const {
+    double res=0;
+    for(int i=0;i<_size;i++)
+        res+=std::norm(_psi[i]);
+    res*=_dx;
+    return sqrt(res);
 }
 /* }}} */
 /* plot method {{{ */
@@ -63,9 +69,8 @@ void GPE1D::plot(int nmodes, std::string &name) {
     } else
         nmodes=0;
     if(file.is_open()) {
-        const std::complex<double> *psi=_psi.get();
         for(int i=0;i<_n;i++) {
-            file << i*_dx-_xmax << ' ' << psi[i].real() << ' ' << psi[i].imag();
+            file << i*_dx-_xmax << ' ' << _psi[i].real() << ' ' << _psi[i].imag();
             for(int j=0;j<nmodes;j++) {
                 file << ' ' << u[j*_n+i].real()
                     << ' ' << v[j*_n+i].real();
@@ -146,11 +151,14 @@ void GPE1D::computePhase(std::complex<double> dt) {
 /* }}} */
 /* initialize method {{{ */
 void GPE1D::initialize(Expression *pot) {
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi);
+    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
+    _planFFT=fftw_plan_dft_3d(1,1,_n,rspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
+    _planIFFT=fftw_plan_dft_3d(1,1,_n,pspace,rspace,FFTW_BACKWARD,FFTW_MEASURE);
     //Diagonal part
     VarDef vars;
     vars["X"]=new Constant(0);
     double *v=new double[_n];
-    double *psi=new double[_n];
     for(int i=0;i<_n;i++) {
         double x=i*_dx-_xmax;
         vars["X"]->set(&x);
@@ -158,7 +166,7 @@ void GPE1D::initialize(Expression *pot) {
         vpot*=_vterm;
         _vpot[i]=vpot;
         v[i]=_kterm*(-2/(_dx*_dx))+vpot;
-        psi[i]=vpot<1?sqrt(1-vpot):0;
+        _psi[i]=vpot<1?sqrt(1-vpot):0;
     }
     _H0.diag(0).assign(v);
     delete[] v;
@@ -173,13 +181,6 @@ void GPE1D::initialize(Expression *pot) {
     _H0.diag(-1).assign(vl);
     delete[] vu;
     delete[] vl;
-    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
-    fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
-    _planFFT=fftw_plan_dft_3d(1,1,_n,rspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
-    _planIFFT=fftw_plan_dft_3d(1,1,_n,pspace,rspace,FFTW_BACKWARD,FFTW_MEASURE);
-    //Copy initial state into memory
-    _psi=cvm::cvector(psi,_n);
-    delete[] psi;
 }
 /* }}} */
 /* ekin method {{{ */

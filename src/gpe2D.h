@@ -25,6 +25,7 @@ class Polar1D : public GPE {
         Polar1D(ConfigMap &config, Expression *H, Expression *pot);
         double norm(cvm::rvector &psi) const;
         double norm(cvm::cvector &psi) const;
+        double norm() const;
         void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
         state getHeader(std::ifstream &file);
@@ -33,6 +34,9 @@ class Polar1D : public GPE {
         void findGroundState(double dttest, double tol, double dttol, string &name, int verb=0);
         void initialize(Expression *pot);
     protected:
+        double *_diag;
+        double *_diagu;
+        double *_diagd;
         double _rmin;   //!<Minimum allowed radius.
         double _dr;     //!<Grid step size.
         int _n;         //!<Number of grid points.
@@ -71,6 +75,7 @@ class GPE2D : public GPE {
         void spectrum(string &name, int m=0);
         double norm(cvm::rvector &psi) const;
         double norm(cvm::cvector &psi) const;
+        double norm() const;
         void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
         state getHeader(std::ifstream &file);

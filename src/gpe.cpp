@@ -54,12 +54,13 @@ void quickSort(std::complex<double> *v, int first, int last,cvm::scmatrix &evecs
 GPE::GPE(Expression *H, Expression *pot) {
     _H=H;
     _pot=pot;
-    _vpot=0;
     update(0);
+    _psi=0;
     _psip=0;
     _phase=0;
     _vpot=0;
     _mu=0;
+    _size=0;
 }
 /* }}} */
 /* findGroundState method {{{ */
@@ -144,7 +145,7 @@ void GPE::findGroundState(double dttest, double tol, double dttol, string &name,
 /* spectrum method {{{ */
 void GPE::spectrum(string &name, int m) {
     std::cerr << "[I] Compute spectrum method... m=" << m << std::endl;
-    int n=_psi.size();
+    int n=_size;
     int N=2*n;
     cvm::srmatrix H(N);
     cvm::srmatrix A(H,1,1,n);
@@ -155,9 +156,8 @@ void GPE::spectrum(string &name, int m) {
     D-=_H0;
     double *psi2=new double[n];
     double *d=new double[n];
-    std::complex<double> *v=_psi.get();
     for(int i=0;i<n;i++) {
-        psi2[i]=_gN*std::norm(v[i]);
+        psi2[i]=_gN*std::norm(_psi[i]);
         d[i]=2*psi2[i]-_mu;
     }
     A.diag(0)+=cvm::rvector(d,n);
@@ -228,8 +228,9 @@ void GPE::spectrum(string &name, int m) {
 /* }}} */
 /* normalize method {{{ */
 double GPE::normalize() {
-    double res=norm(_psi);
-    _psi/=res;
+    double res=norm();
+    for(int i=0;i<_size;i++)
+        _psi[i]/=res;
     return res;
 };
 /* }}} */
@@ -238,13 +239,12 @@ void GPE::save(std::string &name) const {
     std::ofstream file(name.c_str(),std::ofstream::binary);
     if(file.is_open()) {
         setHeader(file);
-        const std::complex<double> *v=_psi.get();
-        int n=_psi.size();
+        int n=_size;
         for(int i=0;i<n;i++) {
-            file.write((const char*)&(v[i].real()),sizeof(double));
+            file.write((const char*)&(_psi[i].real()),sizeof(double));
         }
         for(int i=0;i<n;i++) {
-            file.write((const char*)&(v[i].imag()),sizeof(double));
+            file.write((const char*)&(_psi[i].imag()),sizeof(double));
         }
         file.close();
     } else {
@@ -260,15 +260,14 @@ void GPE::load(std::string &name) {
         switch(getHeader(file)) {
             case ok:
                 {
-                    std::complex<double> *v=_psi.get();
-                    int n=_psi.size();
+                    int n=_size;
                     std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << n << ")" << std::endl;
                     for(int i=0;i<n;i++) {
-                        file.read((char*)&(v[i].real()),sizeof(double));
+                        file.read((char*)&(_psi[i].real()),sizeof(double));
                     }
                     if(!file.eof()) {
                         for(int i=0;i<n;i++) {
-                            file.read((char*)&(v[i].imag()),sizeof(double));
+                            file.read((char*)&(_psi[i].imag()),sizeof(double));
                         }
                     }
                 }
@@ -285,10 +284,9 @@ void GPE::load(std::string &name) {
 /* }}} */
 /* doStep method {{{ */
 void GPE::doStep(std::complex<double> dt) {
-    int n=_psi.size();
-    std::complex<double> *v=_psi.get();
+    int n=_size;
     for(int i=0;i<n;i++)
-        v[i]*=std::exp(dt*(_vpot[i]+_gN*std::norm(v[i])-_mu));
+        _psi[i]*=std::exp(dt*(_vpot[i]+_gN*std::norm(_psi[i])-_mu));
     fftw_execute(_planFFT);
     for(int i=0;i<n;i++)
         _psip[i]*=_phase[i];
@@ -306,7 +304,7 @@ void GPE::evolve(double tstart, double dttest, double tend, std::string &name) {
     while(t<tend) {
         doStep(dt);
         if(c%100==0) {
-            std::cout << t << ' ' << norm(_psi)
+            std::cout << t << ' ' << norm()
                 << ' ' << measure()
                 << '\n';
         }
@@ -326,9 +324,11 @@ void GPE::evolve(double tstart, double dttest, double tend, std::string &name) {
 /* }}} */
 /* allocate method {{{ */
 void GPE::allocate(int n) {
-    _psip=new std::complex<double>[n];
-    _phase=new std::complex<double>[n];
-    _vpot=new double[n];
+    _size=n;
+    _psi=new std::complex<double>[_size];
+    _psip=new std::complex<double>[_size];
+    _phase=new std::complex<double>[_size];
+    _vpot=new double[_size];
 }
 /* }}} */
 /* update method {{{ */
@@ -367,10 +367,9 @@ std::string GPE::measure() {
 double GPE::epot() {
     double res=0.;
     double n2=0.;
-    int n=_psi.size();
-    std::complex<double> *v=_psi.get();
+    int n=_size;
     for(int i=0;i<n;i++) {
-        double v2=std::norm(v[i]);
+        double v2=std::norm(_psi[i]);
         res+=v2*(_vpot[i]+_gN*v2/2);
         n2+=v2;
     }

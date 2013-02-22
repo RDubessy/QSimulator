@@ -51,6 +51,7 @@ class GPE {
         virtual double norm(cvm::rvector &psi) const=0;
         /*!\brief Computes the norm of a complex vector. */
         virtual double norm(cvm::cvector &psi) const=0;
+        virtual double norm() const=0;
         /*!\brief Implements the --plot option through gnuplot. */
         virtual void plot(int nmode, std::string &name) =0;
         /*!\brief Save the groundstate wave function to a file. */
@@ -86,17 +87,18 @@ class GPE {
     protected:
         const char *_type;
         cvm::srbmatrix _H0; //!<Single body hamiltonian, stored as a tridiagonal real matrix.
-        cvm::cvector _psi;  //!<Groundstate wave function, stored as a complex vector.
         double _gN;         //!<Interaction term.
         double _kterm;      //!<Kinetic term prefactor.
         double _vterm;      //!<Potential term prefactor.
         double _mu;         //!<Chemical potential (or groundstate energy if no interactions).
+        std::complex<double> *_psi;     //!<Real space wave function representation.
         std::complex<double> *_psip;    //!<Fourier space wave function representation.
         std::complex<double> *_phase;   //!<Phase for Fourier transform methods.
         double *_vpot;      //!<Real space potential array.
         fftw_plan _planFFT; //!<Resource for forward FFT.
         fftw_plan _planIFFT;//!<Resource for backward FFT.
         Expression *_H;     //!<Symbolic representation of the Hamiltonian.
+        int _size;          //!<Size of the wave functions.
     private:
         Expression *_pot;   //!<Symbolic representation of the potential.
 };

@@ -15,6 +15,7 @@ class GPE1D : public GPE {
         GPE1D(ConfigMap &config, Expression *H, Expression *pot);
         double norm(cvm::rvector &psi) const;
         double norm(cvm::cvector &psi) const;
+        double norm() const;
         void plot(int nmode, std::string &name);
         void setHeader(std::ofstream &file) const;
         state getHeader(std::ifstream &file);

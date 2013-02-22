@@ -35,7 +35,6 @@ GPE3D::GPE3D(ConfigMap &config, Expression *H, Expression *pot) : GPE(H,pot) {
     _ymax/=2;
     _zmax/=2;
     int n=_nx*_ny*_nz;
-    _psi.resize(n);
     allocate(n);
 }
 /* }}} */
@@ -52,18 +51,24 @@ double GPE3D::norm(cvm::rvector &psi) const {
 double GPE3D::norm(cvm::cvector &psi) const {
     return sqrt(_dx*_dy*_dz)*psi.norm2();
 }
+double GPE3D::norm() const {
+    double res=0.;
+    for(int i=0;i<_size;i++)
+        res+=std::norm(_psi[i]);
+    res*=_dx*_dy*_dz;
+    return sqrt(res);
+}
 /* }}} */
 /* plot method {{{ */
 void GPE3D::plot(int nmode, std::string &name) {
     std::ofstream file;
     file.open("/tmp/psiXY.txt");
     if(file.is_open()) {
-        const std::complex<double> *psi=_psi.get();
         for(int j=0;j<_ny;j++) {
             for(int i=0;i<_nx;i++) {
                 double psi2=0;
                 for(int k=0;k<_nz;k++)
-                    psi2+=std::norm(psi[i+(j+k*_ny)*_nx]);
+                    psi2+=std::norm(_psi[i+(j+k*_ny)*_nx]);
                 psi2/=2*_zmax;
                 file << i*_dx-_xmax << ' ' << j*_dy-_ymax << ' ' << psi2
                     << '\n';
@@ -76,12 +81,11 @@ void GPE3D::plot(int nmode, std::string &name) {
     }
     file.open("/tmp/psiXZ.txt");
     if(file.is_open()) {
-        const std::complex<double> *psi=_psi.get();
         for(int k=0;k<_nz;k++) {
             for(int i=0;i<_nx;i++) {
                 double psi2=0;
                 for(int j=0;j<_ny;j++)
-                    psi2+=std::norm(psi[i+(j+k*_ny)*_nx]);
+                    psi2+=std::norm(_psi[i+(j+k*_ny)*_nx]);
                 psi2/=2*_ymax;
                 file << k*_dz-_zmax << ' ' << i*_dx-_xmax << ' ' << psi2
                     << '\n';
@@ -161,13 +165,12 @@ void GPE3D::computePhase(std::complex<double> dt) {
 /* }}} */
 /* initialize method {{{ */
 void GPE3D::initialize(Expression *pot) {
+    initializeFFT();
     //Only a diagonal part
     VarDef vars;
     vars["X"]=new Constant(0);
     vars["Y"]=new Constant(0);
     vars["Z"]=new Constant(0);
-    int n=_nx*_ny*_nz;
-    double *psi=new double[n];
     for(int k=0;k<_nz;k++) {
         double z=k*_dz-_zmax;
         vars["Z"]->set(&z);
@@ -180,18 +183,15 @@ void GPE3D::initialize(Expression *pot) {
                 double vpot=*((double*)(pot->evaluate(vars)));
                 vpot*=_vterm;
                 _vpot[i+(j+k*_ny)*_nx]=vpot;
-                psi[i+(j+k*_ny)*_nx]=vpot<1?sqrt(1-vpot):0;
+                _psi[i+(j+k*_ny)*_nx]=vpot<1?sqrt(1-vpot):0;
             }
         }
     }
-    initializeFFT();
-    _psi=cvm::cvector(psi,n);
-    delete[] psi;
 }
 /* }}} */
 /* initializeFFT method {{{ */
 void GPE3D::initializeFFT() {
-    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi);
     fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
     _planFFT=fftw_plan_dft_3d(_nz,_ny,_nx,rspace,pspace,FFTW_FORWARD,FFTW_MEASURE);
     _planIFFT=fftw_plan_dft_3d(_nz,_ny,_nx,pspace,rspace,FFTW_BACKWARD,FFTW_MEASURE);
@@ -228,7 +228,7 @@ GPE3DROT::GPE3DROT(ConfigMap &config, Expression *H, Expression *pot) : GPE3D(co
 void GPE3DROT::initializeFFT() {
     std::cerr << "[I] FFT in Rotating Frame" << std::endl;
     //Initialize the plans for fast fourier transform
-    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi.get());
+    fftw_complex *rspace=reinterpret_cast<fftw_complex*>(_psi);
     fftw_complex *pspace=reinterpret_cast<fftw_complex*>(_psip);
     fftw_iodim dimx,dimy,dimz;
     dimz.n=_nz;
@@ -290,10 +290,9 @@ void GPE3DROT::computePhase(std::complex<double> dt) {
 /* }}} */
 /* doStep method {{{ */
 void GPE3DROT::doStep(std::complex<double> dt) {
-    int n=_psi.size();
-    std::complex<double> *v=_psi.get();
+    int n=_nx*_ny*_nz;
     for(int i=0;i<n;i++)
-        v[i]*=std::exp(dt*(_vpot[i]-_mu+_gN*std::norm(v[i])));
+        _psi[i]*=std::exp(dt*(_vpot[i]-_mu+_gN*std::norm(_psi[i])));
     fftw_execute(_planFFTxz);
     for(int i=0;i<n;i++)
         _psip[i]*=_phase[i];
@@ -368,18 +367,17 @@ std::string GPE3DROT::measure() {
 /* class GPE3DThermal implementation {{{ */
 /* Constructor {{{ */
 GPE3DThermal::GPE3DThermal(ConfigMap &config, Expression *H, Expression *pot,VarDef &params) : GPE3D(config,H,pot), Thermal(config,params) {
-    int n=_psi.size();
+    _type="T3D";
+    int n=_nx*_ny*_nz;
     _n0=new double[n];
     memset(_n0,0,n*sizeof(double));
-    _type="T3D";
 }
 /* }}} */
 /* doStep method {{{ */
 void GPE3DThermal::doStep(std::complex<double> dt) {
-    int n=_psi.size();
-    std::complex<double> *v=_psi.get();
+    int n=_nx*_ny*_nz;
     for(int i=0;i<n;i++)
-        v[i]*=std::exp(dt*(_vpot[i]+_gN*(_Nbec*std::norm(v[i])+2*_n0[i])-_mu));
+        _psi[i]*=std::exp(dt*(_vpot[i]+_gN*(_Nbec*std::norm(_psi[i])+2*_n0[i])-_mu));
     fftw_execute(_planFFT);
     for(int i=0;i<n;i++)
         _psip[i]*=_phase[i];
@@ -388,10 +386,9 @@ void GPE3DThermal::doStep(std::complex<double> dt) {
 /* }}} */
 /* thermalStep method {{{ */
 double GPE3DThermal::thermalStep() {
-    int n=_psi.size();
-    std::complex<double> *v=_psi.get();
+    int n=_nx*_ny*_nz;
     for(int i=0;i<n;i++) {
-        double z=std::exp(-_beta*(_vpot[i]+2*_gN*(_Nbec*std::norm(v[i])+_n0[i])-_mu));
+        double z=std::exp(-_beta*(_vpot[i]+2*_gN*(_Nbec*std::norm(_psi[i])+_n0[i])-_mu));
         if(z<=1)
             _n0[i]=polylog3half(z)/(_lambda*_lambda*_lambda);
     }
@@ -406,7 +403,7 @@ double GPE3DThermal::thermalStep() {
 /* findGroundState method {{{ */
 void GPE3DThermal::findGroundState(double dttest, double tol, double dttol, string &name, int verb) {
     double nold,eps;
-    int n=_psi.size();
+    int n=_nx*_ny*_nz;
     do {
         nold=_Ntherm;
         double ntmp,rel,mutmp,murel;
@@ -459,13 +456,12 @@ void GPE3DThermal::save(std::string &name) const {
     std::ofstream file(name.c_str(),std::ofstream::binary);
     if(file.is_open()) {
         setHeader(file);
-        const std::complex<double> *v=_psi.get();
-        int n=_psi.size();
+        int n=_nx*_ny*_nz;
         for(int i=0;i<n;i++) {
-            file.write((const char*)&(v[i].real()),sizeof(double));
+            file.write((const char*)&(_psi[i].real()),sizeof(double));
         }
         for(int i=0;i<n;i++) {
-            file.write((const char*)&(v[i].imag()),sizeof(double));
+            file.write((const char*)&(_psi[i].imag()),sizeof(double));
         }
         for(int i=0;i<n;i++) {
             file.write((const char*)&(_n0[i]),sizeof(double));
@@ -484,14 +480,13 @@ void GPE3DThermal::load(std::string &name) {
         switch(getHeader(file)) {
             case ok:
                 {
-                    std::complex<double> *v=_psi.get();
-                    int n=_psi.size();
+                    int n=_nx*_ny*_nz;
                     std::cerr << "[I] Loading wavefunction (mu : " << _mu << ", #grid : " << n << ")" << std::endl;
                     for(int i=0;i<n;i++) {
-                        file.read((char*)&(v[i].real()),sizeof(double));
+                        file.read((char*)&(_psi[i].real()),sizeof(double));
                     }
                     for(int i=0;i<n;i++) {
-                        file.read((char*)&(v[i].imag()),sizeof(double));
+                        file.read((char*)&(_psi[i].imag()),sizeof(double));
                     }
                     std::cerr << "[I] Loading thermal part [" << _Nbec << "/" << _Ntherm << "]" << std::endl;
                     for(int i=0;i<n;i++) {
@@ -514,13 +509,12 @@ void GPE3DThermal::plot(int nmode, std::string &name) {
     std::ofstream file;
     file.open("/tmp/psiXY.txt");
     if(file.is_open()) {
-        const std::complex<double> *psi=_psi.get();
         for(int j=0;j<_ny;j++) {
             for(int i=0;i<_nx;i++) {
                 double psi2=0;
                 double nz=0;
                 for(int k=0;k<_nz;k++) {
-                    psi2+=std::norm(psi[i+(j+k*_ny)*_nx]);
+                    psi2+=std::norm(_psi[i+(j+k*_ny)*_nx]);
                     nz+=_n0[i+(j+k*_ny)*_nz];
                 }
                 psi2/=2*_zmax;
@@ -536,13 +530,12 @@ void GPE3DThermal::plot(int nmode, std::string &name) {
     }
     file.open("/tmp/psiXZ.txt");
     if(file.is_open()) {
-        const std::complex<double> *psi=_psi.get();
         for(int k=0;k<_nz;k++) {
             for(int i=0;i<_nx;i++) {
                 double psi2=0;
                 double ny=0;
                 for(int j=0;j<_ny;j++) {
-                    psi2+=std::norm(psi[i+(j+k*_ny)*_nx]);
+                    psi2+=std::norm(_psi[i+(j+k*_ny)*_nx]);
                     ny+=_n0[i+(j+k*_ny)*_nx];
                 }
                 psi2/=2*_ymax;
